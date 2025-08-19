@@ -5,6 +5,7 @@ body {
 }
 
 @theme {
+  --color-upbrightred: #c41b4b;
   --color-upred: #8D1436;
   --color-upgreen: #00563F;
   --color-upyellow: #FFB61C;

@@ -29,25 +29,11 @@ export default function Login() {
     >
       {/* Dark overlay for readability */}
       <div className="absolute inset-0 bg-black/20"></div>
-      
-      {/* Dark overlay for readability */}
-      <a
-        href="https://privacy.up.edu.ph/"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="items-center gap-2 text-xs text-white/70"
-      >
-        <img
-          src={PrivacyNotice}
-          alt="Privacy Notice"
-          className="w-auto h-100 opacity-80"
-        />
-      </a>
-
+  
       {/* Login Card */}
       <form
         onSubmit={handleLogin}
-        className="relative z-10 flex items-center justify-center backdrop-blur-sm bg-upred/60 p-10 rounded-2xl shadow-xl w-[48rem] border-10 border-upyellow/50 gap-10"
+        className="relative z-10 flex items-center justify-center backdrop-blur-sm bg-upred/60 p-10 rounded-sm shadow-xl w-[48rem] border-5 border-upyellow/50 gap-10"
       >
         {/* Logo Section */}
         <div>
@@ -84,6 +70,19 @@ export default function Login() {
           </p>
         </div>
       </form>
+
+      {/* Privacy Notice */}
+      <button className="absolute bottom-3 left-4 flex items-center gap-3 opacity-60 hover:cursor-pointer hover:opacity-90 hover:hover:scale-105 transition" onClick={() => window.open('https://privacy.up.edu.ph/', '_blank')}>
+        <img
+          src={PrivacyNotice}
+          alt="Privacy Notice"
+          className="w-10"
+        />
+        <div className="flex flex-col items-start text-sm text-white/70 text-center">
+          <div className="font-semibold text-upbrightred">UP</div>
+          <div>Privacy Notice</div>
+        </div>
+      </button>
     </div>
   )
 }
