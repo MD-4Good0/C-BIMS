@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import LoginBG from '../assets/LoginBG.png'
 import BIMS from '../assets/W-BIMS.png'
 import Google from '../assets/Google.png'
+import PrivacyNotice from '../assets/PrivacyNotice.png'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -23,40 +24,64 @@ export default function Login() {
 
   return (
     <div
-      className="font-poppins flex justify-center items-center h-screen bg-black bg-cover bg-center"
+      className="relative font-poppins flex justify-center items-center h-screen bg-black bg-cover bg-center gap-20"
       style={{ backgroundImage: `url(${LoginBG})` }}
     >
+      {/* Dark overlay for readability */}
+      <div className="absolute inset-0 bg-black/20"></div>
+      
+      {/* Dark overlay for readability */}
+      <a
+        href="https://privacy.up.edu.ph/"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="items-center gap-2 text-xs text-white/70"
+      >
+        <img
+          src={PrivacyNotice}
+          alt="Privacy Notice"
+          className="w-auto h-100 opacity-80"
+        />
+      </a>
+
+      {/* Login Card */}
       <form
         onSubmit={handleLogin}
-        className="flex items-center justify-center bg-upred/70 p-8 rounded-xl shadow-md w-full max-w-xl border-upyellow/70 border-4 gap-10"
+        className="relative z-10 flex items-center justify-center backdrop-blur-sm bg-upred/60 p-10 rounded-2xl shadow-xl w-[48rem] border-10 border-upyellow/50 gap-10"
       >
         {/* Logo Section */}
         <div>
           <img
             src={BIMS}
             alt="BIMS Logo"
-            className="m-auto w-40 mb-3"
+            className="m-auto w-72 mb-3 hover:scale-105 transition"
           />
         </div>
 
         {/* Login Section */}
-        <div className="flex flex-col justify-center h-auto w-64">
-          <div className="text-center text-white">UP MANILA</div>
-          <div className="text-center text-4xl font-semibold text-white mb-4">BIMS</div>
+        <div className="flex flex-col justify-center h-auto w-90">
+          <div className="text-center text-2xl font-light text-white">UP Manila</div>
+          <div className="text-center text-6xl font-extrabold text-white tracking-wide mb-2">BIMS</div>
+          <div className="text-center text-base italic text-white/80 mb-4">Building Inventory Management System</div>
 
           <button
             type="submit"
-            className="group w-full h-auto flex items-center justify-center gap-2 p-2
-              text-black/50 bg-white/80 rounded-xl
-              transition duration-300 hover:bg-upgreen hover:text-white/70 cursor-pointer"
+            className="group flex items-center justify-center gap-3 py-2 px-4
+              text-black/80 bg-white rounded-full shadow-md
+              transition duration-300 hover:scale-105 hover:shadow-lg hover:bg-upgreen hover:text-white/80 cursor-pointer mb-1"
           >
             <img
               src={Google}
               alt="Google Logo"
-              className="w-8 opacity-50 transition duration-300 delay-100 group-hover:invert"
+              className="w-6 opacity-70 transition duration-300 group-hover:invert"
             />
-            <div>Login with UP Mail</div>
+            <span className="font-medium">Login with UP Mail</span>
           </button>
+
+          {/* Copyright */}
+          <p className="text-xs text-white/70 mt-4 text-center">
+            © 2026 UP Manila Building Inventory Management System
+          </p>
         </div>
       </form>
     </div>
