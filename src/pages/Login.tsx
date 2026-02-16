@@ -35,7 +35,7 @@ export default function Login() {
     const top = window.screen.height / 2 - height / 2;
 
     const popup = window.open(
-      `https://omaeytrjtduarnvyowuu.supabase.co/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(
+      `https://quqwbezmlozyxrerljhd.supabase.co/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(
         "http://localhost:5173/popup-callback"
       )}`,
       "GoogleLogin",
