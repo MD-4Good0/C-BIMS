@@ -1,0 +1,69 @@
+import { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
+import { getBuildingById, updateBuilding } from "../buildings";
+import SidebarLayout from "../layouts/SidebarLayout";
+
+export default function EditBuilding() {
+  const { id } = useParams();
+  const [form, setForm] = useState<any>(null);
+
+  useEffect(() => {
+    async function load() {
+      const data = await getBuildingById(Number(id));
+      setForm(data);
+    }
+    load();
+  }, [id]);
+
+  function handleChange(e: any) {
+    const { name, value, type, checked } = e.target;
+    setForm({
+      ...form,
+      [name]:
+        type === "checkbox"
+          ? checked
+          : type === "number"
+          ? Number(value)
+          : value,
+    });
+  }
+
+  async function handleSubmit(e: any) {
+    e.preventDefault();
+    await updateBuilding(Number(id), form);
+    alert("Building updated");
+  }
+
+  if (!form) return <p>Loading...</p>;
+
+  return (
+    <SidebarLayout background="white">
+        <div className="bg-white h-screen">
+            <form onSubmit={handleSubmit}>
+            <h1>Edit Building</h1>
+
+            <input
+                name="college_name"
+                value={form.college_name}
+                onChange={handleChange}
+            />
+
+            <input
+                name="building_name"
+                value={form.building_name}
+                onChange={handleChange}
+            />
+
+            <input
+                name="num_floors"
+                type="number"
+                value={form.num_floors}
+                onChange={handleChange}
+            />
+
+            <button type="submit">Save Changes</button>
+            </form>
+        </div>      
+    </SidebarLayout>
+  );
+}

@@ -2,10 +2,13 @@ import { useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import SidebarLayout from "../layouts/SidebarLayout";
 import { useState, useEffect } from "react";
+import { getBuildings } from "../buildings";
+import { Link } from "react-router-dom";
 
 export default function Dashboard() {
   const location = useLocation();
   const fromLogin = location.state?.fromLogin;
+  const [buildings, setBuildings] = useState<any[]>([]);
 
   const [showFade, setShowFade] = useState(fromLogin);
 
@@ -16,6 +19,15 @@ export default function Dashboard() {
       return () => clearTimeout(timer);
     }
   }, [fromLogin]);
+
+  useEffect(() => {
+    async function load() {
+      const data = await getBuildings();
+      setBuildings(data);
+    }
+    load();
+  }, []);
+
 
   return (
     <>
@@ -37,6 +49,23 @@ export default function Dashboard() {
         <div className="bg-white h-screen p-6">
           <h1 className="text-2xl font-bold mb-4">Welcome to the Dashboard, Cael!</h1>
           <p>What would you like to do?</p>
+          <Link to="/add-building">Add Building</Link>
+          
+          <h1>Buildings</h1>
+
+          {buildings.length === 0 ? (
+            <p>No buildings yet</p>
+          ) : (
+            <ul>
+              {buildings.map((b) => (
+                <li key={b.id}>
+                  {b.building_name} — {b.college_name}
+                  {" | "}
+                  <Link to={`/edit-building/${b.id}`}>Edit</Link>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>      
       </SidebarLayout>
     </>
