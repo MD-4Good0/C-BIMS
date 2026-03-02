@@ -30,8 +30,16 @@ export default function EditBuilding() {
 
   async function handleSubmit(e: any) {
     e.preventDefault();
-    await updateBuilding(Number(id), form);
-    alert("Building updated");
+
+    const { id: _, created_at, updated_at, ...updates } = form;
+
+    try {
+      await updateBuilding(Number(id), updates);
+      alert("Building updated successfully");
+    } catch (err) {
+      console.error(err);
+      alert("Update failed — check console");
+    }
   }
 
   if (!form) return <p>Loading...</p>;

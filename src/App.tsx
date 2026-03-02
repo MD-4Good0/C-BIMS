@@ -7,6 +7,7 @@ import AddBuilding from './pages/AddBuilding'
 import EditBuilding from './pages/EditBuilding'
 import PopupCallback from './components/PopupCallback'
 import ProtectedRoute from './components/ProtectedRoute'
+import AdminColleges from './pages/AdminColleges'
 
 function App() {
   return (
@@ -42,6 +43,14 @@ function App() {
         element={
           <ProtectedRoute>
             <EditBuilding  />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/colleges"
+        element={
+          <ProtectedRoute>
+            <AdminColleges />
           </ProtectedRoute>
         }
       />

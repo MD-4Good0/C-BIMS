@@ -4,7 +4,14 @@ import { supabase } from "./supabaseClient";
 export async function getBuildings() {
   const { data, error } = await supabase
     .from("buildings")
-    .select("*")
+    .select(`
+      id,
+      building_name,
+      college_id,
+      colleges:college_id (
+        name
+      )
+    `)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -60,4 +67,17 @@ export async function getBuildingById(id: number) {
   }
 
   return data;
+}
+
+/* DELETE */
+export async function deleteBuilding(id: number) {
+  const { error } = await supabase
+    .from("buildings")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    console.error("Error deleting building:", error);
+    throw error;
+  }
 }
