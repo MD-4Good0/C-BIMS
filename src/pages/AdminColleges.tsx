@@ -68,16 +68,31 @@ export default function AdminColleges() {
         value={newCollege}
         onChange={(e) => setNewCollege(e.target.value)}
       />
-      <button onClick={handleCreate}>Add</button>
+      <button 
+        onClick={handleCreate}
+        className="cursor-pointer"
+      >
+        Add
+      </button>
 
       <ul>
         {colleges.map((c) => (
           <li key={c.id}>
             {c.name}
             {" | "}
-            <button onClick={() => handleUpdate(c.id)}>Edit</button>
+            <button 
+            onClick={() => handleUpdate(c.id)}
+            className="cursor-pointer"
+            >
+              Edit
+            </button>
             {" | "}
-            <button onClick={() => handleDelete(c.id)}>Delete</button>
+            <button 
+            onClick={() => handleDelete(c.id)}
+            className="cursor-pointer"
+            >
+              Delete
+            </button>
           </li>
         ))}
       </ul>

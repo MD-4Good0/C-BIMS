@@ -32,6 +32,11 @@ export default function Dashboard() {
     rooms: 0,
   });
 
+  function canAddMoreFloors(buildingId: number, declaredFloors: number) {
+    const existingFloors = floorsMap[buildingId] || [];
+    return existingFloors.length < declaredFloors;
+  }
+
   function isAdmin() {
     return role === "admin";
   }
@@ -44,10 +49,6 @@ export default function Dashboard() {
     return role === "chief";
   }
 
-  function canManageBuildings() {
-    return isAdmin();
-  }
-
   function canManageFloors() {
     return isAdmin() || isStaff();
   }
@@ -56,13 +57,9 @@ export default function Dashboard() {
     return isAdmin() || isStaff();
   }
 
-  function canDelete() {
-    return isAdmin();
-  }
-
   useEffect(() => {
     if (fromLogin) {
-      const timer = setTimeout(() => setShowFade(false), 600); // match fade duration
+      const timer = setTimeout(() => setShowFade(false), 600);
       return () => clearTimeout(timer);
     }
   }, [fromLogin]);
@@ -190,19 +187,44 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {isChief() && (
-            <p className="text-gray-500 mb-4">
-              Read-only access. Contact administrator for changes.
-            </p>
-          )}
-
-          {canManageBuildings() && (
+          {/* ADMIN */}
+          {isAdmin() && (
             <div className="mb-6">
-              <Link to="/admin/colleges" className="mr-4 underline">
+              <Link to="/admin/colleges" className="mr-4 underline cursor-pointer">
                 Manage Colleges
               </Link>
-              <Link to="/add-building" className="underline">
+              <Link to="/add-building" className="mr-4 underline cursor-pointer">
                 Add Building
+              </Link>
+              <Link to="/reports" className="mr-4 underline cursor-pointer">
+                View Reports
+              </Link>
+              <Link to="/service-requests" className="underline cursor-pointer">
+                Service Requests
+              </Link>
+            </div>
+          )}
+
+          {/* STAFF */}
+          {isStaff() && (
+            <div className="mb-6">
+              <Link to="/add-building" className="mr-4 underline cursor-pointer">
+                Add Building
+              </Link>
+              <Link to="/service-requests" className="underline cursor-pointer">
+                Service Requests
+              </Link>
+            </div>
+          )}
+
+          {/* CHIEF */}
+          {isChief() && (
+            <div className="mb-6">
+              <Link to="/reports" className="mr-4 underline cursor-pointer">
+                View Reports
+              </Link>
+              <Link to="/service-requests" className="underline cursor-pointer">
+                Service Requests
               </Link>
             </div>
           )}
@@ -221,9 +243,12 @@ export default function Dashboard() {
             <ul>
               {buildings.map((b) => (
                 <li key={b.id} className="mb-4 p-4 border rounded-lg">
-                  <strong>Building:</strong> {b.building_name} — {b.colleges?.name || "No College"}
+                  <strong>Building:</strong> {b.building_name} — {b.colleges?.name || "No College"} 
+                  <span className="text-sm text-gray-500">
+                    {" "}({(floorsMap[b.id] || []).length}/{b.num_floors} floors recorded)
+                  </span>
 
-                  {canManageBuildings() && (
+                  {isAdmin() && (
                     <>
                       {" | "}
                       <Link to={`/edit-building/${b.id}`}>Edit</Link>
@@ -233,7 +258,10 @@ export default function Dashboard() {
                   {role === "admin" && (
                     <>
                       {" | "}
-                      <button onClick={() => handleDelete(b.id)}>
+                      <button
+                        onClick={() => handleDelete(b.id)}
+                        className="cursor-pointer"
+                      >
                         Delete
                       </button>
                     </>
@@ -250,20 +278,23 @@ export default function Dashboard() {
                         <li key={f.id}>
                           <strong>Floor {f.floor_number}</strong>
 
-                          {canDelete() && (
+                          {isAdmin() && (
                             <>
                               {" | "}
-                              <button onClick={async () => {
-                                const floorRooms = roomsMap[f.id] || [];
+                              <button 
+                                onClick={async () => {
+                                  const floorRooms = roomsMap[f.id] || [];
 
-                                if (floorRooms.length > 0) {
-                                  alert("Cannot delete floor with existing rooms");
-                                  return;
-                                }
+                                  if (floorRooms.length > 0) {
+                                    alert("Cannot delete floor with existing rooms");
+                                    return;
+                                  }
 
-                                await deleteFloor(f.id);
-                                await load();
-                              }}>
+                                  await deleteFloor(f.id);
+                                  await load();
+                                }}
+                                className="cursor-pointer"
+                              >
                                 Delete
                               </button>
                             </>
@@ -280,13 +311,16 @@ export default function Dashboard() {
                                 <li key={r.id}>
                                   Room: {r.room_number}
 
-                                  {canDelete() && (
+                                  {isAdmin() && (
                                     <>
                                       {" | "}
-                                      <button onClick={async () => {
-                                        await deleteRoom(r.id);
-                                        load();
-                                      }}>
+                                      <button 
+                                        onClick={async () => {
+                                          await deleteRoom(r.id);
+                                          load();
+                                        }}
+                                        className="cursor-pointer"
+                                      >
                                         Delete
                                       </button>
                                     </>
@@ -326,6 +360,7 @@ export default function Dashboard() {
                                     setNewRoom({ ...newRoom, [f.id]: "" });
                                     await load();
                                   }}
+                                  className="cursor-pointer"
                                 >
                                   Add Room
                                 </button>
@@ -344,9 +379,19 @@ export default function Dashboard() {
                           onChange={(e) =>
                             setNewFloor({ ...newFloor, [b.id]: e.target.value })
                           }
+                          className="border p-2 rounded mr-2"
+                          disabled={!canAddMoreFloors(b.id, b.num_floors)}
                         />
+
                         <button
                           onClick={async () => {
+                            const existingFloors = floorsMap[b.id] || [];
+
+                            if (existingFloors.length >= b.num_floors) {
+                              alert("You cannot add more floors than the building's declared number of floors.");
+                              return;
+                            }
+
                             const floorNumber = Number(newFloor[b.id]);
 
                             if (isNaN(floorNumber) || floorNumber <= 0) {
@@ -362,14 +407,25 @@ export default function Dashboard() {
                               } else {
                                 alert("Failed to add floor");
                               }
+                              return;
                             }
 
                             setNewFloor({ ...newFloor, [b.id]: "" });
                             await load();
                           }}
+                          className={`${
+                            canAddMoreFloors(b.id, b.num_floors)
+                              ? "cursor-pointer"
+                              : "opacity-50 cursor-not-allowed"
+                          }`}
+                          disabled={!canAddMoreFloors(b.id, b.num_floors)}
                         >
                           Add Floor
                         </button>
+
+                        <p className="text-sm text-gray-500 mt-1">
+                          Declared floors: {b.num_floors} | Added floors: {(floorsMap[b.id] || []).length}
+                        </p>
                       </>
                     )}
                   </div>

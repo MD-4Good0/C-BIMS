@@ -1,12 +1,12 @@
 import { supabase } from "./supabaseClient";
 
-/* READ */
 export async function getBuildings() {
   const { data, error } = await supabase
     .from("buildings")
     .select(`
       id,
       building_name,
+      num_floors,
       college_id,
       colleges:college_id (
         name
