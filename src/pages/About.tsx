@@ -1,4 +1,3 @@
-// src/pages/Dashboard.tsx
 import SidebarLayout from "../layouts/SidebarLayout"
 import AboutBG from '../assets/AboutBG.jpg'
 
@@ -46,8 +45,8 @@ export default function About() {
           >
             <h1 className="font-bold text-3xl">MISSION</h1>
             <p className="text-center text-base">
-              To document the different and dynamic attributes of the buildings of the University of the Philippines Manila. 
-              This system also aims to provide on-the-go reports for the different statuses of UP Manila buildings. 
+            To maintain an updated record of the physical, regulatory, and compliance information of the buildings of the University of the Philippines Manila.
+            This system also aims to provide on-the-go reports for the different statuses of UP Manila buildings.
             </p>
           </motion.div>
         </div>

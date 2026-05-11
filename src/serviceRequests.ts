@@ -5,10 +5,17 @@ export async function getServiceRequests() {
     .from("service_requests")
     .select(`
       *,
-      profiles:submitted_by (
+      buildings (
         id,
-        full_name,
-        role
+        building_name
+      ),
+      floors (
+        id,
+        floor_number
+      ),
+      rooms (
+        id,
+        room_number
       )
     `)
     .order("created_at", { ascending: false });
@@ -21,10 +28,18 @@ export async function createServiceRequest(payload: {
   title: string;
   description: string;
   submitted_by: string;
+  building_id: number | null;
+  floor_id: number | null;
+  room_id: number | null;
 }) {
   const { data, error } = await supabase
     .from("service_requests")
-    .insert([payload])
+    .insert([
+      {
+        ...payload,
+        status: "pending",
+      },
+    ])
     .select();
 
   if (error) throw error;

@@ -25,9 +25,15 @@ export default function EditBuilding() {
         college_id: buildingData.college_id ? String(buildingData.college_id) : "",
         renovated_area: buildingData.renovated_area ?? 0,
         future_renovation: buildingData.future_renovation ?? 0,
+        ongoing_renovation_area: buildingData.ongoing_renovation_area ?? 0,
         cost_per_sqm: buildingData.cost_per_sqm ?? 0,
         proposed_dev_cost: buildingData.proposed_dev_cost ?? 0,
         file_link: buildingData.file_link ?? "",
+        generator_issue_date: buildingData.generator_issue_date ?? "",
+        generator_expiration_date: buildingData.generator_expiration_date ?? "",
+        cmr_submission: buildingData.cmr_submission ?? false,
+        smr_submission: buildingData.smr_submission ?? false,
+        testing_requirements: buildingData.testing_requirements ?? false,
         elevator_permit_issue: buildingData.elevator_permit_issue ?? "",
         elevator_permit_expiration: buildingData.elevator_permit_expiration ?? "",
         building_permit_date: buildingData.building_permit_date ?? "",
@@ -54,6 +60,18 @@ export default function EditBuilding() {
             : Number(value)
           : value,
     }));
+  }
+
+  function calculateFutureRenovation(currentForm = form) {
+    const totalFloorArea = Number(currentForm.total_floor_area) || 0;
+    const renovatedArea = currentForm.renovated_bool
+      ? Number(currentForm.renovated_area) || 0
+      : 0;
+    const ongoingArea = currentForm.ongoing_renovation
+      ? Number(currentForm.ongoing_renovation_area) || 0
+      : 0;
+
+    return Math.max(totalFloorArea - (renovatedArea + ongoingArea), 0);
   }
 
   async function handleSubmit(e: any) {
@@ -96,10 +114,22 @@ export default function EditBuilding() {
       return;
     }
 
+    if (form.generator && !form.generator_issue_date) {
+      alert("Generator issue date is required when generator is checked");
+      return;
+    }
+
+    if (form.generator && !form.generator_expiration_date) {
+      alert("Generator expiration date is required when generator is checked");
+      return;
+    }
+
     if (form.has_attachment && !form.file_link.trim()) {
       alert("File link is required when attachment is checked");
       return;
     }
+
+    const calculatedFutureRenovation = calculateFutureRenovation();
 
     const {
       id: _ignoreId,
@@ -113,30 +143,38 @@ export default function EditBuilding() {
       ...rest,
       college_id: Number(form.college_id),
 
-      renovated_area: Number(form.renovated_area) || null,
-      future_renovation: Number(form.future_renovation) || null,
+      renovated_area: form.renovated_bool ? Number(form.renovated_area) || null : null,
+      ongoing_renovation: Boolean(form.ongoing_renovation),
+      ongoing_renovation_area: form.ongoing_renovation
+        ? Number(form.ongoing_renovation_area) || null
+        : null,
+      future_renovation: calculatedFutureRenovation,
       cost_per_sqm: Number(form.cost_per_sqm) || null,
       proposed_dev_cost: Number(form.proposed_dev_cost) || null,
 
-      ongoing_renovation: form.ongoing_renovation || null,
       elevator_permit_issue: form.elevator_permit_issue || null,
       elevator_permit_expiration: form.elevator_permit_expiration || null,
+      generator_issue_date: form.generator_issue_date || null,
+      generator_expiration_date: form.generator_expiration_date || null,
       file_link: form.file_link.trim() || null,
     };
-
-    if (!form.renovated_bool) {
-      payload.renovated_area = null;
-      payload.ongoing_renovation = null;
-      payload.future_renovation = null;
-    }
 
     if (!form.elevator) {
       payload.elevator_permit_issue = null;
       payload.elevator_permit_expiration = null;
     }
 
+    if (!form.generator) {
+      payload.generator_issue_date = null;
+      payload.generator_expiration_date = null;
+    }
+
     if (!form.has_attachment) {
       payload.file_link = null;
+    }
+
+    if (!form.renovated_bool) {
+      payload.renovated_area = null;
     }
 
     try {
@@ -279,16 +317,31 @@ export default function EditBuilding() {
                 />
               </div>
 
-              <label className={`flex items-center gap-2 ${!form.renovated_bool ? "opacity-50" : ""}`}>
+              <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
                   name="ongoing_renovation"
                   checked={!!form.ongoing_renovation}
                   onChange={handleChange}
-                  disabled={!form.renovated_bool}
                 />
                 Ongoing Renovation
               </label>
+
+              <div>
+                <label className="block mb-1 font-medium">
+                  Ongoing Renovation Area
+                </label>
+                <input
+                  name="ongoing_renovation_area"
+                  type="number"
+                  value={form.ongoing_renovation_area}
+                  onChange={handleChange}
+                  disabled={!form.ongoing_renovation}
+                  className={`border p-2 rounded w-full ${
+                    !form.ongoing_renovation ? "bg-gray-100 cursor-not-allowed" : ""
+                  }`}
+                />
+              </div>
 
               <div>
                 <label className="block mb-1 font-medium">
@@ -297,12 +350,9 @@ export default function EditBuilding() {
                 <input
                   name="future_renovation"
                   type="number"
-                  value={form.future_renovation}
-                  onChange={handleChange}
-                  disabled={!form.renovated_bool}
-                  className={`border p-2 rounded w-full ${
-                    !form.renovated_bool ? "bg-gray-100 cursor-not-allowed" : ""
-                  }`}
+                  value={calculateFutureRenovation()}
+                  readOnly
+                  className="border p-2 rounded w-full bg-gray-100 cursor-not-allowed"
                 />
               </div>
 
@@ -481,6 +531,42 @@ export default function EditBuilding() {
                 Generator
               </label>
 
+              <div>
+                <label className="block mb-1 font-medium">
+                  Generator Issue Date
+                  {form.generator && <span className="text-red-500"> *</span>}
+                </label>
+                <input
+                  name="generator_issue_date"
+                  type="date"
+                  value={form.generator_issue_date}
+                  onChange={handleChange}
+                  required={form.generator}
+                  disabled={!form.generator}
+                  className={`border p-2 rounded w-full ${
+                    !form.generator ? "bg-gray-100 cursor-not-allowed" : ""
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className="block mb-1 font-medium">
+                  Generator Expiration Date
+                  {form.generator && <span className="text-red-500"> *</span>}
+                </label>
+                <input
+                  name="generator_expiration_date"
+                  type="date"
+                  value={form.generator_expiration_date}
+                  onChange={handleChange}
+                  required={form.generator}
+                  disabled={!form.generator}
+                  className={`border p-2 rounded w-full ${
+                    !form.generator ? "bg-gray-100 cursor-not-allowed" : ""
+                  }`}
+                />
+              </div>
+
               <label className="flex items-center gap-2">
                 <input type="checkbox" name="cistern" checked={form.cistern} onChange={handleChange} />
                 Cistern
@@ -519,6 +605,42 @@ export default function EditBuilding() {
               <label className="flex items-center gap-2">
                 <input type="checkbox" name="fiber_lan" checked={form.fiber_lan} onChange={handleChange} />
                 Fiber / LAN
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <h2 className="text-lg font-semibold mb-2">Environmental Compliance</h2>
+
+            <div className="space-y-3">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  name="cmr_submission"
+                  checked={!!form.cmr_submission}
+                  onChange={handleChange}
+                />
+                CMR Submission
+              </label>
+
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  name="smr_submission"
+                  checked={!!form.smr_submission}
+                  onChange={handleChange}
+                />
+                SMR Submission
+              </label>
+
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  name="testing_requirements"
+                  checked={!!form.testing_requirements}
+                  onChange={handleChange}
+                />
+                Testing Requirements
               </label>
             </div>
           </div>

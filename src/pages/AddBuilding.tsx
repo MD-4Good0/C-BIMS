@@ -19,6 +19,7 @@ export default function AddBuilding() {
     renovated_bool: false,
     renovated_area: 0,
     ongoing_renovation: false,
+    ongoing_renovation_area: 0,
     future_renovation: 0,
     cost_per_sqm: 0,
     proposed_dev_cost: 0,
@@ -38,6 +39,8 @@ export default function AddBuilding() {
     elevator_permit_expiration: "",
 
     generator: false,
+    generator_issue_date: "",
+    generator_expiration_date: "",
     cistern: false,
     septic_tank: false,
     electrical_wiring: false,
@@ -46,6 +49,10 @@ export default function AddBuilding() {
     fire_protection: false,
     ventilation: false,
     fiber_lan: false,
+
+    cmr_submission: false,
+    smr_submission: false,
+    testing_requirements: false,
 
     has_attachment: false,
     file_link: "",
@@ -77,6 +84,18 @@ export default function AddBuilding() {
             : Number(value)
           : value,
     }));
+  }
+
+  function calculateFutureRenovation(currentForm = form) {
+    const totalFloorArea = Number(currentForm.total_floor_area) || 0;
+    const renovatedArea = currentForm.renovated_bool
+      ? Number(currentForm.renovated_area) || 0
+      : 0;
+    const ongoingArea = currentForm.ongoing_renovation
+      ? Number(currentForm.ongoing_renovation_area) || 0
+      : 0;
+
+    return Math.max(totalFloorArea - (renovatedArea + ongoingArea), 0);
   }
 
   async function handleSubmit(e: any) {
@@ -119,23 +138,39 @@ export default function AddBuilding() {
       return;
     }
 
+    if (form.generator && !form.generator_issue_date) {
+      alert("Generator issue date is required when generator is checked");
+      return;
+    }
+
+    if (form.generator && !form.generator_expiration_date) {
+      alert("Generator expiration date is required when generator is checked");
+      return;
+    }
+
     if (form.has_attachment && !form.file_link.trim()) {
       alert("File link is required when attachment is checked");
       return;
     }
 
+    const calculatedFutureRenovation = calculateFutureRenovation();
+
     const payload = {
       ...form,
       college_id: Number(form.college_id),
 
-      renovated_area: Number(form.renovated_area) || null,
-      future_renovation: Number(form.future_renovation) || null,
+      renovated_area: form.renovated_bool ? Number(form.renovated_area) || null : null,
+      ongoing_renovation: Boolean(form.ongoing_renovation),
+      ongoing_renovation_area: form.ongoing_renovation
+        ? Number(form.ongoing_renovation_area) || null
+        : null,
+      future_renovation: calculatedFutureRenovation,
       cost_per_sqm: Number(form.cost_per_sqm) || null,
       proposed_dev_cost: Number(form.proposed_dev_cost) || null,
-
-      ongoing_renovation: form.ongoing_renovation || null,
       elevator_permit_issue: form.elevator_permit_issue || null,
       elevator_permit_expiration: form.elevator_permit_expiration || null,
+      generator_issue_date: form.generator_issue_date || null,
+      generator_expiration_date: form.generator_expiration_date || null,
       file_link: form.file_link.trim() || null,
     };
 
@@ -148,10 +183,9 @@ export default function AddBuilding() {
       payload.elevator_permit_expiration = null;
     }
 
-    if (!form.renovated_bool) {
-      payload.renovated_area = null;
-      payload.ongoing_renovation = null;
-      payload.future_renovation = null;
+    if (!form.generator) {
+      payload.generator_issue_date = null;
+      payload.generator_expiration_date = null;
     }
 
     try {
@@ -295,16 +329,33 @@ export default function AddBuilding() {
                 />
               </div>
 
-              <label className={`flex items-center gap-2 ${!form.renovated_bool ? "opacity-50" : ""}`}>
+              <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
                   name="ongoing_renovation"
                   checked={!!form.ongoing_renovation}
                   onChange={handleChange}
-                  disabled={!form.renovated_bool}
                 />
                 Ongoing Renovation
               </label>
+
+              <div>
+                <label className="block mb-1 font-medium">
+                  Ongoing Renovation Area
+                </label>
+
+                <input
+                  name="ongoing_renovation_area"
+                  type="number"
+                  placeholder="Ongoing Renovation Area"
+                  value={form.ongoing_renovation_area}
+                  onChange={handleChange}
+                  disabled={!form.ongoing_renovation}
+                  className={`border p-2 rounded w-full ${
+                    !form.ongoing_renovation ? "bg-gray-100 cursor-not-allowed" : ""
+                  }`}
+                />
+              </div>
 
               <div>
                 <label className="block mb-1 font-medium">
@@ -315,12 +366,9 @@ export default function AddBuilding() {
                   name="future_renovation"
                   type="number"
                   placeholder="Future Renovation Area"
-                  value={form.future_renovation}
-                  onChange={handleChange}
-                  disabled={!form.renovated_bool}
-                  className={`border p-2 rounded w-full ${
-                    !form.renovated_bool ? "bg-gray-100 cursor-not-allowed" : ""
-                  }`}
+                  value={calculateFutureRenovation()}
+                  readOnly
+                  className="border p-2 rounded w-full bg-gray-100 cursor-not-allowed"
                 />
               </div>
 
@@ -502,6 +550,42 @@ export default function AddBuilding() {
                 Generator
               </label>
 
+              <div>
+                <label className="block mb-1 font-medium">
+                  Generator Issue Date
+                  {form.generator && <span className="text-red-500"> *</span>}
+                </label>
+                <input
+                  name="generator_issue_date"
+                  type="date"
+                  value={form.generator_issue_date}
+                  onChange={handleChange}
+                  required={form.generator}
+                  disabled={!form.generator}
+                  className={`border p-2 rounded w-full ${
+                    !form.generator ? "bg-gray-100 cursor-not-allowed" : ""
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className="block mb-1 font-medium">
+                  Generator Expiration Date
+                  {form.generator && <span className="text-red-500"> *</span>}
+                </label>
+                <input
+                  name="generator_expiration_date"
+                  type="date"
+                  value={form.generator_expiration_date}
+                  onChange={handleChange}
+                  required={form.generator}
+                  disabled={!form.generator}
+                  className={`border p-2 rounded w-full ${
+                    !form.generator ? "bg-gray-100 cursor-not-allowed" : ""
+                  }`}
+                />
+              </div>
+
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -580,6 +664,42 @@ export default function AddBuilding() {
                   onChange={handleChange}
                 />
                 Fiber / LAN
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <h2 className="text-lg font-semibold mb-2">Environmental Compliance</h2>
+
+            <div className="space-y-3">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  name="cmr_submission"
+                  checked={form.cmr_submission}
+                  onChange={handleChange}
+                />
+                CMR Submission
+              </label>
+
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  name="smr_submission"
+                  checked={form.smr_submission}
+                  onChange={handleChange}
+                />
+                SMR Submission
+              </label>
+
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  name="testing_requirements"
+                  checked={form.testing_requirements}
+                  onChange={handleChange}
+                />
+                Testing Requirements
               </label>
             </div>
           </div>

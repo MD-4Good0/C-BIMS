@@ -1,13 +1,15 @@
-// src/App.tsx
-import { Routes, Route } from 'react-router-dom'
-import Login from './pages/Login'
-import Dashboard from './pages/Dashboard'
-import About from './pages/About'
-import AddBuilding from './pages/AddBuilding'
-import EditBuilding from './pages/EditBuilding'
-import PopupCallback from './components/PopupCallback'
-import ProtectedRoute from './components/ProtectedRoute'
-import AdminColleges from './pages/AdminColleges'
+import { Routes, Route } from "react-router-dom";
+import Login from "./pages/Login";
+import RequestAccess from "./pages/RequestAccess";
+import AdminUsers from "./pages/AdminUsers";
+import Dashboard from "./pages/Dashboard";
+import Profile from "./pages/Profile";
+import About from "./pages/About";
+import AddBuilding from "./pages/AddBuilding";
+import EditBuilding from "./pages/EditBuilding";
+import PopupCallback from "./components/PopupCallback";
+import ProtectedRoute from "./components/ProtectedRoute";
+import AdminColleges from "./pages/AdminColleges";
 import Reports from "./pages/Reports";
 import ServiceRequests from "./pages/ServiceRequests";
 
@@ -16,6 +18,8 @@ function App() {
     <Routes>
       <Route path="/popup-callback" element={<PopupCallback />} />
       <Route path="/" element={<Login />} />
+      <Route path="/request-access" element={<RequestAccess />} />
+
       <Route
         path="/dashboard"
         element={
@@ -24,6 +28,7 @@ function App() {
           </ProtectedRoute>
         }
       />
+
       <Route
         path="/about"
         element={
@@ -32,22 +37,34 @@ function App() {
           </ProtectedRoute>
         }
       />
+
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <Profile />
+          </ProtectedRoute>
+        }
+      />
+
       <Route
         path="/add-building"
         element={
           <ProtectedRoute>
-            <AddBuilding  />
+            <AddBuilding />
           </ProtectedRoute>
         }
       />
+
       <Route
         path="/edit-building/:id"
         element={
           <ProtectedRoute>
-            <EditBuilding  />
+            <EditBuilding />
           </ProtectedRoute>
         }
       />
+
       <Route
         path="/admin/colleges"
         element={
@@ -56,6 +73,16 @@ function App() {
           </ProtectedRoute>
         }
       />
+
+      <Route
+        path="/admin/users"
+        element={
+          <ProtectedRoute>
+            <AdminUsers />
+          </ProtectedRoute>
+        }
+      />
+
       <Route
         path="/reports"
         element={
@@ -64,6 +91,7 @@ function App() {
           </ProtectedRoute>
         }
       />
+
       <Route
         path="/service-requests"
         element={
@@ -73,7 +101,7 @@ function App() {
         }
       />
     </Routes>
-  )
+  );
 }
 
-export default App
+export default App;

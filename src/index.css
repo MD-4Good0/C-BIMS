@@ -11,3 +11,13 @@ body {
   --color-upgreen: #00563F;
   --color-upyellow: #FFB61C;
 }
+
+button,
+a,
+[role="button"] {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}

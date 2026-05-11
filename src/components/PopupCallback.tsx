@@ -25,7 +25,6 @@ export default function PopupCallback() {
 
   return (  
     <div className="w-screen h-screen flex items-center justify-center font-poppins font-light text-xl bg-black text-white/30">
-      Welcome!
     </div>
   );
 

@@ -1,30 +1,47 @@
-// src/pages/Login.tsx
 import { motion, AnimatePresence } from "framer-motion";
-import { supabase } from "../supabaseClient"
+import { supabase } from "../supabaseClient";
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom"
+import { useNavigate } from "react-router-dom";
 
-import LoginBG from "../assets/LoginBG.png"
-import BIMS from "../assets/W-BIMS.png"
-import Google from "../assets/Google.png"
-import PrivacyNotice from "../assets/PrivacyNotice.png"
+import LoginBG from "../assets/LoginBG.png";
+import BIMS from "../assets/W-BIMS.png";
+import Google from "../assets/Google.png";
+import PrivacyNotice from "../assets/PrivacyNotice.png";
 
 export default function Login() {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
+    async function checkSession() {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (session) {
         navigate("/dashboard");
       }
-    })
-  }, [navigate])
+    }
+
+    checkSession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        navigate("/dashboard", { state: { fromLogin: true } });
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [navigate]);
 
   const [fadeOverlay, setFadeOverlay] = useState(true);
   const [loggingIn, setLoggingIn] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => setFadeOverlay(false)); // match duration
+    const timer = setTimeout(() => setFadeOverlay(false), 600);
     return () => clearTimeout(timer);
   }, []);
 
@@ -34,6 +51,8 @@ export default function Login() {
     const left = window.screen.width / 2 - width / 2;
     const top = window.screen.height / 2 - height / 2;
 
+    setLoggingIn(true);
+
     const popup = window.open(
       `https://quqwbezmlozyxrerljhd.supabase.co/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(
         "http://localhost:5173/popup-callback"
@@ -42,24 +61,25 @@ export default function Login() {
       `width=${width},height=${height},top=${top},left=${left}`
     );
 
-    const handleMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return;
-      if (event.data.type === "SUPABASE_LOGIN_SUCCESS") {
-        console.log("Login successful!", event.data.session);
+    if (!popup) {
+      setLoggingIn(false);
+      alert("Popup was blocked. Please allow popups and try again.");
+      return;
+    }
 
-        setLoggingIn(true);
+    const pollPopup = setInterval(() => {
+      if (popup.closed) {
+        clearInterval(pollPopup);
 
-        setTimeout(() => {
-          navigate("/dashboard", { state: { fromLogin: true } });
-        }, 600);
-        window.removeEventListener("message", handleMessage);
+        supabase.auth.getSession().then(({ data }) => {
+          if (!data.session) {
+            setLoggingIn(false);
+          }
+        });
       }
-    };
-
-    window.addEventListener("message", handleMessage);
+    }, 500);
   };
-
-
+  
   return (
     <div
       className="relative font-poppins flex justify-center items-center h-screen bg-black bg-cover bg-center gap-20"
