@@ -15,7 +15,7 @@ export default function PopupCallback() {
           {
             type: "BIMS_AUTH_SUCCESS",
           },
-          window.location.origin
+          "*"
         );
 
         window.close();
