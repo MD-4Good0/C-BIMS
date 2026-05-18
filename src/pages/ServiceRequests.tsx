@@ -461,7 +461,7 @@ export default function ServiceRequests() {
                     type="button"
                     onClick={handleConfirmStatusChange}
                     disabled={processingStatus}
-                    className="rounded-lg border border-upgreen/30 px-5 py-2 text-upgreen transition hover:bg-upgreen/10 disabled:opacity-50"
+                    className="rounded-lg bg-upgreen px-5 py-2 text-white/90 transition hover:scale-110"
                   >
                     ✔
                   </button>
@@ -470,7 +470,7 @@ export default function ServiceRequests() {
                     type="button"
                     onClick={() => setStatusModal(null)}
                     disabled={processingStatus}
-                    className="rounded-lg border border-upred/30 px-5 py-2 text-upred transition hover:bg-upred/10 disabled:opacity-50"
+                    className="rounded-lg bg-upred px-5 py-2 text-white/90 transition hover:scale-110"
                   >
                     ✖
                   </button>

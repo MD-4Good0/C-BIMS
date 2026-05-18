@@ -61,6 +61,7 @@ export default function Dashboard() {
 
   const [editingRoom, setEditingRoom] = useState<{
     id: number;
+    floorId: number;
     value: string;
   } | null>(null);
 
@@ -469,34 +470,35 @@ export default function Dashboard() {
     }
   }
 
-  async function handleRenameRoom(roomId: number, floorId: number) {
+  async function handleRenameRoom() {
     if (!canRenameFloorRoom()) {
       showToast("Only admins can rename rooms.", "warning");
       return;
     }
-
-    if (!editingRoom || editingRoom.id !== roomId) return;
-
+  
+    if (!editingRoom) return;
+  
+    const roomId = editingRoom.id;
+    const floorId = editingRoom.floorId;
     const roomNumber = editingRoom.value.trim();
-
+  
     if (!roomNumber) {
       showToast("Room number cannot be empty", "warning");
       return;
     }
-
+  
     const existingRooms = roomsMap[floorId] || [];
     const alreadyExists = existingRooms.some(
       (room) =>
         room.id !== roomId &&
-        String(room.room_number).trim().toLowerCase() ===
-          roomNumber.toLowerCase()
+        String(room.room_number).trim().toLowerCase() === roomNumber.toLowerCase()
     );
-
+  
     if (alreadyExists) {
       showToast("That room already exists on this floor", "warning");
       return;
     }
-
+  
     try {
       await updateRoom(roomId, roomNumber);
       setEditingRoom(null);
@@ -764,7 +766,7 @@ export default function Dashboard() {
                   type="button"
                   onClick={handleConfirmDelete}
                   disabled={deleting}
-                  className="rounded-lg border border-upgreen/30 px-5 py-2 text-upgreen transition hover:bg-upgreen/10 disabled:opacity-50"
+                  className="rounded-lg bg-upgreen px-5 py-2 text-white/90 transition hover:scale-110 disabled:opacity-50"
                 >
                   ✔
                 </button>
@@ -773,9 +775,81 @@ export default function Dashboard() {
                   type="button"
                   onClick={() => setDeleteModal(null)}
                   disabled={deleting}
-                  className="rounded-lg border border-upred/30 px-5 py-2 text-upred transition hover:bg-upred/10 disabled:opacity-50"
+                  className="rounded-lg bg-upred px-5 py-2 text-white/90 transition hover:scale-110 disabled:opacity-50"
                 >
                   ✖
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {editingRoom && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onMouseDown={() => setEditingRoom(null)}
+          >
+            <motion.div
+              className="ml-15 w-full max-w-md rounded-2xl border border-white/40 bg-white/95 p-6 shadow-xl backdrop-blur-md"
+              initial={{ scale: 0.9, opacity: 0, y: 12 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 12 }}
+              transition={{ duration: 0.2 }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <div className="mb-5 text-center">
+                <h2 className="text-2xl font-extrabold text-upred">
+                  Edit Room
+                </h2>
+
+                <p className="mt-2 text-sm text-black/60">
+                  Update the room number.
+                </p>
+              </div>
+
+              <div className="mb-6 h-px w-full bg-black/10" />
+
+              <label className="mb-1 block text-sm font-medium">
+                Room Number
+              </label>
+
+              <input
+                value={editingRoom.value}
+                onChange={(e) =>
+                  setEditingRoom((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          value: e.target.value,
+                        }
+                      : prev
+                  )
+                }
+                className="w-full rounded-lg border border-upred/30 bg-white/90 p-3 transition focus:border-upred focus:outline-none"
+                autoFocus
+              />
+
+              <div className="mt-8 flex justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setEditingRoom(null)}
+                  className="rounded-xl border border-upred/30 px-5 py-2 text-sm font-medium text-upred transition hover:bg-upred/10"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleRenameRoom}
+                  className="rounded-xl border border-upgreen/30 px-5 py-2 text-sm font-medium text-upgreen transition hover:bg-upgreen/10"
+                >
+                  Save
                 </button>
               </div>
             </motion.div>
@@ -892,13 +966,13 @@ export default function Dashboard() {
               <div />
 
               <div className="flex justify-center">
-                <div className="inline-flex overflow-hidden rounded-xl border border-upred/30 bg-white/90">
+              <div className="inline-flex overflow-hidden rounded-xl border border-black/10 bg-white/90">
                   <button
                     type="button"
                     onClick={() => setViewMode("hierarchy")}
                     className={`px-5 py-2 text-sm font-medium transition ${
                       viewMode === "hierarchy"
-                        ? "bg-upred/10 text-upred"
+                        ? "bg-upred/25 text-upred"
                         : "text-upred hover:bg-upred/10"
                     }`}
                   >
@@ -910,7 +984,7 @@ export default function Dashboard() {
                     onClick={() => setViewMode("table")}
                     className={`px-5 py-2 text-sm font-medium transition ${
                       viewMode === "table"
-                        ? "bg-upred/10 text-upred"
+                        ? "bg-upred/25 text-upred"
                         : "text-upred hover:bg-upred/10"
                     }`}
                   >
@@ -925,7 +999,7 @@ export default function Dashboard() {
                   onClick={() => setShowFilters((prev) => !prev)}
                   className={`rounded-xl border border-upgreen/30 px-5 py-2 text-sm font-medium transition ${
                     showFilters
-                      ? "bg-upgreen/10 text-upgreen"
+                      ? "bg-upyellow/25 text-black"
                       : "text-upgreen hover:bg-upgreen/10"
                   }`}
                 >
@@ -1203,7 +1277,7 @@ export default function Dashboard() {
                                   key={f.id}
                                   className="border-t border-[#8d1b39]/10 hover:bg-[#8d1b39]/5"
                                 >
-                                  <td className="p-3 font-medium">
+                                  <td className="p-3 font-medium min-w-30">
                                     {editingFloor?.id === f.id ? (
                                       <div className="flex min-w-52 gap-2">
                                         <input
@@ -1236,9 +1310,8 @@ export default function Dashboard() {
                                         </button>
                                       </div>
                                     ) : (
-                                      <div className="flex items-center gap-2">
+                                      <div className="flex items-center gap-5">
                                         <span>Floor {f.floor_number}</span>
-
                                         {canRenameFloorRoom() && (
                                           <button
                                             type="button"
@@ -1268,93 +1341,55 @@ export default function Dashboard() {
                                         {(roomsMap[f.id] || []).map((r) => (
                                           <span
                                             key={r.id}
-                                            className="rounded-full border border-[#1c5843]/30 px-2 py-1 text-xs"
+                                            className="inline-flex items-center gap-1"
                                           >
-                                            {editingRoom?.id === r.id ? (
-                                              <span className="inline-flex items-center gap-2">
-                                                <input
-                                                  value={
-                                                    editingRoom?.value ?? ""
-                                                  }
-                                                  onChange={(e) =>
+                                            <>
+                                              {canRenameFloorRoom() ? (
+                                                <button
+                                                  type="button"
+                                                  onClick={() =>
                                                     setEditingRoom({
                                                       id: r.id,
-                                                      value: e.target.value,
+                                                      floorId: f.id,
+                                                      value: String(r.room_number),
                                                     })
                                                   }
-                                                  className="w-28 rounded border border-[#1c5843]/30 bg-white px-2 py-1 text-xs"
-                                                />
+                                                  title="Edit room number"
+                                                  className="rounded-full border border-upgreen/30 px-3 py-1 text-xs font-medium text-upgreen transition hover:bg-upgreen/10"
+                                                >
+                                                  Room {r.room_number}
+                                                </button>
+                                              ) : (
+                                                <>Room {r.room_number}</>
+                                              )}
 
+                                              {canDeleteFloorRoom() && (
                                                 <button
                                                   type="button"
-                                                  onClick={() =>
-                                                    handleRenameRoom(r.id, f.id)
-                                                  }
-                                                  className="font-semibold text-upgreen"
+                                                  onClick={() => {
+                                                    setDeleteModal({
+                                                      title: "Delete room?",
+                                                      message: `Are you sure you want to delete Room ${r.room_number}?`,
+                                                      onConfirm: async () => {
+                                                        await deleteRoom(r.id);
+                                                        await load();
+                                                      },
+                                                    });
+                                                  }}
+                                                  title="Delete room"
+                                                  className="ml-2 text-upred transition hover:scale-110"
                                                 >
-                                                  Save
+                                                  ×
                                                 </button>
-
-                                                <button
-                                                  type="button"
-                                                  onClick={() =>
-                                                    setEditingRoom(null)
-                                                  }
-                                                  className="font-semibold text-upred"
-                                                >
-                                                  Cancel
-                                                </button>
-                                              </span>
-                                            ) : (
-                                              <>
-                                                Room {r.room_number}
-
-                                                {canRenameFloorRoom() && (
-                                                  <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                      setEditingRoom({
-                                                        id: r.id,
-                                                        value: String(
-                                                          r.room_number
-                                                        ),
-                                                      })
-                                                    }
-                                                    title="Rename room"
-                                                    className="ml-2 text-upgreen transition hover:scale-110"
-                                                  >
-                                                    ✎
-                                                  </button>
-                                                )}
-
-                                                {canDeleteFloorRoom() && (
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                      setDeleteModal({
-                                                        title: "Delete room?",
-                                                        message: `Are you sure you want to delete Room ${r.room_number}?`,
-                                                        onConfirm: async () => {
-                                                          await deleteRoom(r.id);
-                                                          await load();
-                                                        },
-                                                      });
-                                                    }}
-                                                    title="Delete room"
-                                                    className="ml-2 text-upred transition hover:scale-110"
-                                                  >
-                                                    ×
-                                                  </button>
-                                                )}
-                                              </>
-                                            )}
+                                              )}
+                                            </>
                                           </span>
                                         ))}
                                       </div>
                                     )}
                                   </td>
 
-                                  <td className="p-3">
+                                  <td className="p-3 w-60">
                                     {canAddRooms() ? (
                                       <div className="flex min-w-64 gap-2">
                                         <input
@@ -1382,7 +1417,7 @@ export default function Dashboard() {
                                     )}
                                   </td>
 
-                                  <td className="p-3">
+                                  <td className="p-3 min-w-30">
                                     {canDeleteFloorRoom() ? (
                                       <button
                                         type="button"

@@ -331,14 +331,14 @@ export default function AdminUsers() {
             </div>
 
             <div className="mb-6 flex justify-center">
-              <div className="inline-flex overflow-hidden rounded-xl border border-upred/30 bg-white/90">
+              <div className="inline-flex overflow-hidden rounded-xl border border-black/10 bg-white/90">
                 <button
                   type="button"
                   onClick={() => setActiveView("pending")}
                   className={`px-5 py-2 text-sm font-medium transition ${
                     activeView === "pending"
-                      ? "bg-upred text-white"
-                      : "text-upred hover:bg-upred/10"
+                      ? "bg-upyellow/20 text-black"
+                      : "text-black/60 hover:bg-upyellow/10"
                   }`}
                 >
                   Pending
@@ -349,8 +349,8 @@ export default function AdminUsers() {
                   onClick={() => setActiveView("approved")}
                   className={`px-5 py-2 text-sm font-medium transition ${
                     activeView === "approved"
-                      ? "bg-upred text-white"
-                      : "text-upred hover:bg-upred/10"
+                      ? "bg-upgreen/10 text-upgreen"
+                      : "text-upgreen hover:bg-upgreen/10"
                   }`}
                 >
                   Approved
@@ -361,7 +361,7 @@ export default function AdminUsers() {
                   onClick={() => setActiveView("rejected")}
                   className={`px-5 py-2 text-sm font-medium transition ${
                     activeView === "rejected"
-                      ? "bg-upred text-white"
+                      ? "bg-upred/10 text-upred"
                       : "text-upred hover:bg-upred/10"
                   }`}
                 >

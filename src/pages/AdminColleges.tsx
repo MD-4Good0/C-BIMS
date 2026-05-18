@@ -180,21 +180,6 @@ export default function AdminColleges() {
     );
   }, [colleges, search]);
 
-  const statCards = useMemo(() => {
-    return [
-      {
-        label: "Colleges",
-        value: colleges.length,
-        color: "bg-upred",
-      },
-      {
-        label: "Shown",
-        value: filteredColleges.length,
-        color: "bg-upgreen",
-      },
-    ];
-  }, [colleges.length, filteredColleges.length]);
-
   return (
     <SidebarLayout background="white">
       <div className="min-h-screen bg-white p-6">
@@ -330,18 +315,6 @@ export default function AdminColleges() {
           </p>
         ) : (
           <>
-            <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {statCards.map((card) => (
-                <div
-                  key={card.label}
-                  className={`flex min-h-24 flex-col justify-center rounded-2xl border border-white/40 px-5 py-4 shadow-md backdrop-blur-sm ${card.color} text-white/90 transition hover:scale-105 hover:text-white hover:shadow-lg`}
-                >
-                  <div className="text-sm font-medium">{card.label}</div>
-                  <div className="text-3xl font-extrabold">{card.value}</div>
-                </div>
-              ))}
-            </div>
-
             <div className="mb-6 grid grid-cols-1 gap-5 lg:grid-cols-[1fr_1fr]">
               <div className="rounded-2xl border border-upgreen/15 bg-white/80 p-5 shadow-sm backdrop-blur-sm">
                 <h2 className="text-lg font-bold text-upgreen">Add College</h2>
@@ -369,8 +342,8 @@ export default function AdminColleges() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-upred/15 bg-white/80 p-5 shadow-sm backdrop-blur-sm">
-                <h2 className="text-lg font-bold text-upred">Search</h2>
+              <div className="rounded-2xl border border-upyellow/30 bg-white/80 p-5 shadow-sm backdrop-blur-sm">
+                <h2 className="text-lg font-bold text-upyellow">Search</h2>
 
                 <p className="mt-1 text-sm text-black/60">
                   Find a college by name.
@@ -380,7 +353,7 @@ export default function AdminColleges() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search colleges"
-                  className="mt-4 w-full rounded-lg border border-upred/30 bg-white/90 p-3"
+                  className="mt-4 w-full rounded-lg border border-upyellow/50 bg-white/90 p-3"
                 />
               </div>
             </div>
