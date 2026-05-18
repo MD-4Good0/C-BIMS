@@ -4,7 +4,6 @@ import { supabase } from "../supabaseClient";
 import { useToast } from "../components/ToastProvider";
 
 import LoginBG from "../assets/LoginBG.png";
-import BIMS from "../assets/W-BIMS.png";
 import PrivacyNotice from "../assets/PrivacyNotice.png";
 
 type AccessStatus =
@@ -193,30 +192,13 @@ export default function RequestAccess() {
         initial={{ opacity: 0.5, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.9 }}
-        className="relative z-10 flex w-full max-w-4xl flex-col items-center justify-center gap-8 rounded-xl border-5 border-upyellow/50 bg-upred/60 p-8 shadow-xl backdrop-blur-sm md:flex-row md:p-10"
+        className="relative z-10 flex w-full max-w-xl flex-col items-center justify-center rounded-xl border-5 border-upyellow/50 bg-upred/60 p-8 shadow-xl backdrop-blur-sm md:p-10"
       >
-        <motion.div
-          initial={{ opacity: 0, scale: 0.96 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.7, delay: 0.1 }}
-          className="flex w-full flex-col items-center justify-center md:w-1/2"
-        >
-          <img
-            src={BIMS}
-            alt="BIMS Logo"
-            className="mb-4 w-64 transition hover:scale-105"
-          />
-
-          <p className="text-center text-sm italic text-white/75">
-            Building Inventory Management System
-          </p>
-        </motion.div>
-
         <motion.div
           initial={{ opacity: 0, x: 16 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.7, delay: 0.2 }}
-          className="w-full md:w-1/2"
+          className="w-full"
         >
           <div className="mb-5 text-center md:text-left">
             <p className="text-xl font-light text-white/85">UP Manila BIMS</p>
