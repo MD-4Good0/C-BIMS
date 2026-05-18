@@ -58,7 +58,7 @@ export default function Login() {
 
     const popup = window.open(
       `https://quqwbezmlozyxrerljhd.supabase.co/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(
-        "http://localhost:5173/popup-callback"
+        "https://c-bims.vercel.app//popup-callback"
       )}`,
       "GoogleLogin",
       `width=${width},height=${height},top=${top},left=${left}`
@@ -77,6 +77,7 @@ export default function Login() {
         supabase.auth.getSession().then(({ data }) => {
           if (!data.session) {
             setLoggingIn(false);
+            showToast("Failed to authenticate with Google.", "error");
           }
         });
       }
