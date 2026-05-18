@@ -15,28 +15,19 @@ export default function Login() {
   const { showToast } = useToast();
 
   useEffect(() => {
-    async function checkSession() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (session) {
-        navigate("/dashboard");
-      }
-    }
-
-    checkSession();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
+    function handleAuthMessage(event: MessageEvent) {
+      if (event.origin !== window.location.origin) return;
+  
+      if (event.data?.type === "BIMS_AUTH_SUCCESS") {
+        setLoggingIn(false);
         navigate("/dashboard", { state: { fromLogin: true } });
       }
-    });
-
+    }
+  
+    window.addEventListener("message", handleAuthMessage);
+  
     return () => {
-      subscription.unsubscribe();
+      window.removeEventListener("message", handleAuthMessage);
     };
   }, [navigate]);
 

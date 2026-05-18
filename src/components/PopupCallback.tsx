@@ -1,31 +1,60 @@
-// src/pages/PopupCallback.tsx
 import { useEffect } from "react";
 import { supabase } from "../supabaseClient";
 
 export default function PopupCallback() {
   useEffect(() => {
-    async function sendSessionToOpener() {
-      // Get the new session
-      const { data } = await supabase.auth.getSession();
+    let handled = false;
 
-      // Send session info back to main window
-      if (window.opener && data.session) {
+    function finishLogin() {
+      if (handled) return;
+
+      handled = true;
+
+      if (window.opener) {
         window.opener.postMessage(
-          { type: "SUPABASE_LOGIN_SUCCESS", session: data.session },
+          {
+            type: "BIMS_AUTH_SUCCESS",
+          },
           window.location.origin
         );
-      }
 
-      // Close the popup
-      window.close();
+        window.close();
+      } else {
+        window.location.href = "/dashboard";
+      }
     }
 
-    sendSessionToOpener();
+    async function checkSession() {
+      const { data } = await supabase.auth.getSession();
+
+      if (data.session) {
+        finishLogin();
+      }
+    }
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        finishLogin();
+      }
+    });
+
+    checkSession();
+
+    const fallbackTimer = setTimeout(() => {
+      checkSession();
+    }, 1000);
+
+    return () => {
+      clearTimeout(fallbackTimer);
+      subscription.unsubscribe();
+    };
   }, []);
 
-  return (  
-    <div className="w-screen h-screen flex items-center justify-center font-poppins font-light text-xl bg-black text-white/30">
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-white">
+      <p className="text-sm text-black/60">Finishing login...</p>
     </div>
   );
-
 }
