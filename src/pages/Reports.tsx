@@ -324,7 +324,7 @@ export default function Reports() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className={`rounded-xl bg-upred px-6 py-2 text-sm font-medium text-white transition hover:scale-105 ${
+                  className={`rounded-xl border border-upgreen/30 px-6 py-2 text-sm font-medium text-upgreen transition hover:bg-upgreen/10 ${
                     loading ? "cursor-not-allowed opacity-50" : ""
                   }`}
                 >
@@ -338,7 +338,7 @@ export default function Reports() {
                   onClick={() => setShowFilters((prev) => !prev)}
                   className={`rounded-xl border border-upgreen/30 px-5 py-2 text-sm font-medium transition ${
                     showFilters
-                      ? "bg-upgreen text-white"
+                      ? "bg-upgreen/10 text-upgreen"
                       : "text-upgreen hover:bg-upgreen/10"
                   }`}
                 >
@@ -350,7 +350,7 @@ export default function Reports() {
                   onClick={() => setShowAttributes((prev) => !prev)}
                   className={`rounded-xl border border-upgreen/30 px-5 py-2 text-sm font-medium transition ${
                     showAttributes
-                      ? "bg-upgreen text-white"
+                      ? "bg-upgreen/10 text-upgreen"
                       : "text-upgreen hover:bg-upgreen/10"
                   }`}
                 >
@@ -450,7 +450,7 @@ export default function Reports() {
                       <button
                         type="button"
                         onClick={handleClearFilters}
-                        className="rounded-xl border border-upgreen/30 px-5 py-2 text-sm font-medium text-upgreen transition hover:bg-upgreen/10"
+                        className="rounded-xl border border-upred/30 px-5 py-2 text-sm font-medium text-upred transition hover:bg-upred/10"
                       >
                         Clear Filters
                       </button>
@@ -493,19 +493,34 @@ export default function Reports() {
 
                 <div className="max-h-96 overflow-y-auto pr-2">
                   <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-                    {buildingFields.map((field) => (
-                      <label
-                        key={field.key}
-                        className="flex items-center gap-2 rounded-lg border border-black/10 bg-white/80 px-3 py-2 text-sm transition hover:bg-upred/5"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedFields.includes(field.key)}
-                          onChange={() => handleFieldToggle(field.key)}
-                        />
-                        {field.label}
-                      </label>
-                    ))}
+                    {buildingFields.map((field) => {
+                      const active = selectedFields.includes(field.key);
+
+                      return (
+                        <button
+                          key={field.key}
+                          type="button"
+                          onClick={() => handleFieldToggle(field.key)}
+                          className={`flex items-center justify-between rounded-xl border px-4 py-3 text-left text-sm font-medium transition hover:scale-[1.01] ${
+                            active
+                              ? "border-upgreen/30 bg-upgreen/10 text-upgreen"
+                              : "border-upred/20 bg-white text-black/70 hover:bg-upred/5"
+                          }`}
+                        >
+                          <span>{field.label}</span>
+
+                          <span
+                            className={`flex h-7 w-7 items-center justify-center rounded-full border ${
+                              active
+                                ? "border-upgreen bg-upgreen text-white"
+                                : "border-black/20 bg-white text-transparent"
+                            }`}
+                          >
+                            <Check className="h-4 w-4" />
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>

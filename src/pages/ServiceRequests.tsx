@@ -1,8 +1,6 @@
-// src/pages/ServiceRequests.tsx
-
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, X } from "lucide-react";
+import { Check, ChevronDown, X } from "lucide-react";
 import { useToast } from "../components/ToastProvider";
 import SidebarLayout from "../layouts/SidebarLayout";
 import { supabase } from "../supabaseClient";
@@ -18,6 +16,8 @@ import { getRoomsByFloor } from "../rooms";
 type StatusType = "pending" | "cancelled" | "resolved";
 
 export default function ServiceRequests() {
+  const { showToast } = useToast();
+
   const [requests, setRequests] = useState<any[]>([]);
   const [role, setRole] = useState<string | null>(() => {
     return sessionStorage.getItem("bims_role");
@@ -35,7 +35,17 @@ export default function ServiceRequests() {
   const [floors, setFloors] = useState<any[]>([]);
   const [rooms, setRooms] = useState<any[]>([]);
 
-  const { showToast } = useToast();
+  const [showBuildingDropdown, setShowBuildingDropdown] = useState(false);
+  const [showFloorDropdown, setShowFloorDropdown] = useState(false);
+  const [showRoomDropdown, setShowRoomDropdown] = useState(false);
+
+  const [form, setForm] = useState({
+    title: "",
+    description: "",
+    building_id: "",
+    floor_id: "",
+    room_id: "",
+  });
 
   const [statusModal, setStatusModal] = useState<{
     id: number;
@@ -44,14 +54,35 @@ export default function ServiceRequests() {
   } | null>(null);
 
   const [processingStatus, setProcessingStatus] = useState(false);
-  
-  const [form, setForm] = useState({
-    title: "",
-    description: "",
-    building_id: "",
-    floor_id: "",
-    room_id: "",
-  });
+
+  const selectedBuildingName = useMemo(() => {
+    if (!form.building_id) return "No building selected";
+
+    return (
+      buildings.find((building) => String(building.id) === String(form.building_id))
+        ?.building_name || "No building selected"
+    );
+  }, [buildings, form.building_id]);
+
+  const selectedFloorName = useMemo(() => {
+    if (!form.floor_id) return "No floor selected";
+
+    const selectedFloor = floors.find(
+      (floor) => String(floor.id) === String(form.floor_id)
+    );
+
+    return selectedFloor ? `Floor ${selectedFloor.floor_number}` : "No floor selected";
+  }, [floors, form.floor_id]);
+
+  const selectedRoomName = useMemo(() => {
+    if (!form.room_id) return "No room selected";
+
+    const selectedRoom = rooms.find(
+      (room) => String(room.id) === String(form.room_id)
+    );
+
+    return selectedRoom ? `Room ${selectedRoom.room_number}` : "No room selected";
+  }, [rooms, form.room_id]);
 
   useEffect(() => {
     async function initialize() {
@@ -70,11 +101,11 @@ export default function ServiceRequests() {
 
     const { data } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, status")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
 
-    if (data?.role) {
+    if (data?.status === "approved" && data?.role) {
       setRole(data.role);
       sessionStorage.setItem("bims_role", data.role);
     }
@@ -140,31 +171,48 @@ export default function ServiceRequests() {
 
   function getSubmittedByLabel(request: any) {
     const profile = request.profiles;
-  
+
     if (profile?.full_name) return profile.full_name;
     if (profile?.email) return profile.email;
     if (request.submitted_by) return "Registered user";
-  
+
     return "Not specified";
   }
 
-  async function handleChange(e: any) {
+  function closeRequestForm() {
+    setShowRequestForm(false);
+    setShowBuildingDropdown(false);
+    setShowFloorDropdown(false);
+    setShowRoomDropdown(false);
+  }
+
+  function handleTextChange(e: any) {
     const { name, value } = e.target;
 
-    if (name === "building_id") {
-      if (!value) {
-        setFloors([]);
-        setRooms([]);
-        setForm((prev) => ({
-          ...prev,
-          building_id: "",
-          floor_id: "",
-          room_id: "",
-        }));
-        return;
-      }
+    setForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  }
 
+  async function handleBuildingSelect(value: string) {
+    setShowBuildingDropdown(false);
+
+    if (!value) {
+      setFloors([]);
+      setRooms([]);
+      setForm((prev) => ({
+        ...prev,
+        building_id: "",
+        floor_id: "",
+        room_id: "",
+      }));
+      return;
+    }
+
+    try {
       const floorData = await getFloorsByBuilding(Number(value));
+
       setFloors(floorData || []);
       setRooms([]);
 
@@ -174,21 +222,28 @@ export default function ServiceRequests() {
         floor_id: "",
         room_id: "",
       }));
+    } catch (err: any) {
+      console.error(err);
+      showToast(err.message || "Failed to load floors", "error");
+    }
+  }
+
+  async function handleFloorSelect(value: string) {
+    setShowFloorDropdown(false);
+
+    if (!value) {
+      setRooms([]);
+      setForm((prev) => ({
+        ...prev,
+        floor_id: "",
+        room_id: "",
+      }));
       return;
     }
 
-    if (name === "floor_id") {
-      if (!value) {
-        setRooms([]);
-        setForm((prev) => ({
-          ...prev,
-          floor_id: "",
-          room_id: "",
-        }));
-        return;
-      }
-
+    try {
       const roomData = await getRoomsByFloor(Number(value));
+
       setRooms(roomData || []);
 
       setForm((prev) => ({
@@ -196,42 +251,48 @@ export default function ServiceRequests() {
         floor_id: value,
         room_id: "",
       }));
-      return;
+    } catch (err: any) {
+      console.error(err);
+      showToast(err.message || "Failed to load rooms", "error");
     }
+  }
+
+  function handleRoomSelect(value: string) {
+    setShowRoomDropdown(false);
 
     setForm((prev) => ({
       ...prev,
-      [name]: value,
+      room_id: value,
     }));
   }
 
   async function handleSubmit(e: any) {
     e.preventDefault();
-  
+
     if (submitting) return;
-  
+
     if (!form.title.trim()) {
       showToast("Title is required", "warning");
       return;
     }
-  
+
     if (!form.description.trim()) {
       showToast("Description is required", "warning");
       return;
     }
-  
+
     try {
       setSubmitting(true);
-  
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
-  
+
       if (!user) {
         showToast("You must be logged in", "warning");
         return;
       }
-  
+
       await createServiceRequest({
         title: form.title.trim(),
         description: form.description.trim(),
@@ -240,7 +301,7 @@ export default function ServiceRequests() {
         floor_id: form.floor_id ? Number(form.floor_id) : null,
         room_id: form.room_id ? Number(form.room_id) : null,
       });
-  
+
       setForm({
         title: "",
         description: "",
@@ -248,11 +309,11 @@ export default function ServiceRequests() {
         floor_id: "",
         room_id: "",
       });
-  
+
       setFloors([]);
       setRooms([]);
-      setShowRequestForm(false);
-  
+      closeRequestForm();
+
       await loadRequests();
       showToast("Service request submitted", "success");
     } catch (err: any) {
@@ -273,16 +334,16 @@ export default function ServiceRequests() {
 
   async function handleConfirmStatusChange() {
     if (!statusModal) return;
-  
+
     try {
       setProcessingStatus(true);
-  
+
       const nextStatus = statusModal.nextStatus;
-  
+
       await updateServiceRequestStatus(statusModal.id, nextStatus);
       setStatusModal(null);
       await loadRequests();
-  
+
       showToast(
         `Request marked as ${formatStatus(nextStatus).toLowerCase()}.`,
         "success"
@@ -303,10 +364,10 @@ export default function ServiceRequests() {
   const filteredRequests = useMemo(() => {
     return requests.filter((request) => {
       const matchesStatus = statusFilter ? request.status === statusFilter : true;
-  
+
       const searchText = search.trim().toLowerCase();
       const submittedByText = getSubmittedByLabel(request).toLowerCase();
-  
+
       const matchesSearch =
         searchText === ""
           ? true
@@ -314,7 +375,7 @@ export default function ServiceRequests() {
             request.description?.toLowerCase().includes(searchText) ||
             request.buildings?.building_name?.toLowerCase().includes(searchText) ||
             submittedByText.includes(searchText);
-  
+
       return matchesStatus && matchesSearch;
     });
   }, [requests, statusFilter, search]);
@@ -400,7 +461,7 @@ export default function ServiceRequests() {
                     type="button"
                     onClick={handleConfirmStatusChange}
                     disabled={processingStatus}
-                    className="rounded-lg bg-upgreen px-5 py-2 text-white/90 transition hover:scale-110 disabled:opacity-50"
+                    className="rounded-lg border border-upgreen/30 px-5 py-2 text-upgreen transition hover:bg-upgreen/10 disabled:opacity-50"
                   >
                     ✔
                   </button>
@@ -409,7 +470,7 @@ export default function ServiceRequests() {
                     type="button"
                     onClick={() => setStatusModal(null)}
                     disabled={processingStatus}
-                    className="rounded-lg bg-upred px-5 py-2 text-white/90 transition hover:scale-110 disabled:opacity-50"
+                    className="rounded-lg border border-upred/30 px-5 py-2 text-upred transition hover:bg-upred/10 disabled:opacity-50"
                   >
                     ✖
                   </button>
@@ -448,14 +509,14 @@ export default function ServiceRequests() {
           <div />
 
           <div className="flex justify-center">
-            <div className="inline-flex overflow-hidden rounded-xl border border-upred/30 bg-white/90">
+            <div className="inline-flex overflow-hidden rounded-xl border border-black/10 bg-white/90">
               <button
                 type="button"
                 onClick={() => setStatusFilter("")}
                 className={`px-5 py-2 text-sm font-medium transition ${
                   statusFilter === ""
-                    ? "bg-upred text-white"
-                    : "text-upred hover:bg-upred/10"
+                    ? "bg-black/5 text-black"
+                    : "text-black/60 hover:bg-black/5"
                 }`}
               >
                 All
@@ -466,8 +527,8 @@ export default function ServiceRequests() {
                 onClick={() => setStatusFilter("pending")}
                 className={`px-5 py-2 text-sm font-medium transition ${
                   statusFilter === "pending"
-                    ? "bg-upred text-white"
-                    : "text-upred hover:bg-upred/10"
+                    ? "bg-upyellow/20 text-black"
+                    : "text-black/60 hover:bg-upyellow/10"
                 }`}
               >
                 Pending
@@ -478,8 +539,8 @@ export default function ServiceRequests() {
                 onClick={() => setStatusFilter("resolved")}
                 className={`px-5 py-2 text-sm font-medium transition ${
                   statusFilter === "resolved"
-                    ? "bg-upred text-white"
-                    : "text-upred hover:bg-upred/10"
+                    ? "bg-upgreen/10 text-upgreen"
+                    : "text-upgreen hover:bg-upgreen/10"
                 }`}
               >
                 Resolved
@@ -490,7 +551,7 @@ export default function ServiceRequests() {
                 onClick={() => setStatusFilter("cancelled")}
                 className={`px-5 py-2 text-sm font-medium transition ${
                   statusFilter === "cancelled"
-                    ? "bg-upred text-white"
+                    ? "bg-upred/10 text-upred"
                     : "text-upred hover:bg-upred/10"
                 }`}
               >
@@ -503,14 +564,10 @@ export default function ServiceRequests() {
             {isStaff() && (
               <button
                 type="button"
-                onClick={() => setShowRequestForm((prev) => !prev)}
-                className={`rounded-xl border border-upgreen/30 px-5 py-2 text-sm font-medium transition ${
-                  showRequestForm
-                    ? "bg-upgreen text-white"
-                    : "text-upgreen hover:bg-upgreen/10"
-                }`}
+                onClick={() => setShowRequestForm(true)}
+                className="rounded-xl border border-upgreen/30 px-5 py-2 text-sm font-medium text-upgreen transition hover:bg-upgreen/10 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {showRequestForm ? "Hide Form" : "Submit Request"}
+                Submit Request
               </button>
             )}
 
@@ -519,7 +576,7 @@ export default function ServiceRequests() {
               onClick={() => setShowFilters((prev) => !prev)}
               className={`rounded-xl border border-upgreen/30 px-5 py-2 text-sm font-medium transition ${
                 showFilters
-                  ? "bg-upgreen text-white"
+                  ? "bg-upgreen/10 text-upgreen"
                   : "text-upgreen hover:bg-upgreen/10"
               }`}
             >
@@ -536,7 +593,7 @@ export default function ServiceRequests() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              onMouseDown={() => setShowRequestForm(false)}
+              onMouseDown={closeRequestForm}
             >
               <motion.form
                 onSubmit={handleSubmit}
@@ -549,7 +606,7 @@ export default function ServiceRequests() {
               >
                 <button
                   type="button"
-                  onClick={() => setShowRequestForm(false)}
+                  onClick={closeRequestForm}
                   title="Close form"
                   className="absolute right-5 top-5 rounded-full p-2 text-black/50 transition hover:bg-upred/10 hover:text-upred"
                 >
@@ -569,78 +626,200 @@ export default function ServiceRequests() {
                 <div className="mb-6 h-px w-full bg-black/10" />
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                  <div>
+                  <div className="relative">
                     <label className="mb-1 block text-sm font-medium">Building</label>
-                    <select
-                      name="building_id"
-                      value={form.building_id}
-                      onChange={handleChange}
-                      className="w-full rounded-lg border border-upred/30 bg-white/90 p-3"
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowBuildingDropdown((prev) => !prev);
+                        setShowFloorDropdown(false);
+                        setShowRoomDropdown(false);
+                      }}
+                      className="flex w-full items-center justify-between rounded-lg border border-upred/30 bg-white/90 p-3 text-left transition hover:border-upred/50"
                     >
-                      <option value="">No building selected</option>
-                      {buildings.map((building) => (
-                        <option key={building.id} value={building.id}>
-                          {building.building_name}
-                        </option>
-                      ))}
-                    </select>
+                      <span className={form.building_id ? "text-black" : "text-black/40"}>
+                        {selectedBuildingName}
+                      </span>
+
+                      <ChevronDown
+                        className={`h-5 w-5 text-black/50 transition ${
+                          showBuildingDropdown ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+
+                    {showBuildingDropdown && (
+                      <div className="absolute left-0 right-0 z-40 mt-2 max-h-72 overflow-y-auto rounded-xl border border-upred/20 bg-white shadow-xl">
+                        <button
+                          type="button"
+                          onClick={() => handleBuildingSelect("")}
+                          className={`flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-upred/5 ${
+                            !form.building_id ? "font-semibold text-upred" : "text-black"
+                          }`}
+                        >
+                          No building selected
+                          {!form.building_id && <Check className="h-4 w-4" />}
+                        </button>
+
+                        {buildings.map((building) => {
+                          const selected = String(building.id) === String(form.building_id);
+
+                          return (
+                            <button
+                              key={building.id}
+                              type="button"
+                              onClick={() => handleBuildingSelect(String(building.id))}
+                              className={`flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-upred/5 ${
+                                selected ? "font-semibold text-upred" : "text-black"
+                              }`}
+                            >
+                              {building.building_name}
+                              {selected && <Check className="h-4 w-4" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
 
-                  <div>
+                  <div className="relative">
                     <label className="mb-1 block text-sm font-medium">Floor</label>
-                    <select
-                      name="floor_id"
-                      value={form.floor_id}
-                      onChange={handleChange}
+
+                    <button
+                      type="button"
                       disabled={!form.building_id}
-                      className={`w-full rounded-lg border border-upred/30 p-3 ${
+                      onClick={() => {
+                        if (!form.building_id) return;
+                        setShowFloorDropdown((prev) => !prev);
+                        setShowBuildingDropdown(false);
+                        setShowRoomDropdown(false);
+                      }}
+                      className={`flex w-full items-center justify-between rounded-lg border border-upred/30 p-3 text-left transition ${
                         !form.building_id
                           ? "cursor-not-allowed bg-black/5 text-black/40"
-                          : "bg-white/90"
+                          : "bg-white/90 hover:border-upred/50"
                       }`}
                     >
-                      <option value="">No floor selected</option>
-                      {floors.map((floor) => (
-                        <option key={floor.id} value={floor.id}>
-                          Floor {floor.floor_number}
-                        </option>
-                      ))}
-                    </select>
+                      <span className={form.floor_id ? "text-black" : "text-black/40"}>
+                        {selectedFloorName}
+                      </span>
+
+                      <ChevronDown
+                        className={`h-5 w-5 text-black/50 transition ${
+                          showFloorDropdown ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+
+                    {showFloorDropdown && (
+                      <div className="absolute left-0 right-0 z-40 mt-2 max-h-72 overflow-y-auto rounded-xl border border-upred/20 bg-white shadow-xl">
+                        <button
+                          type="button"
+                          onClick={() => handleFloorSelect("")}
+                          className={`flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-upred/5 ${
+                            !form.floor_id ? "font-semibold text-upred" : "text-black"
+                          }`}
+                        >
+                          No floor selected
+                          {!form.floor_id && <Check className="h-4 w-4" />}
+                        </button>
+
+                        {floors.map((floor) => {
+                          const selected = String(floor.id) === String(form.floor_id);
+
+                          return (
+                            <button
+                              key={floor.id}
+                              type="button"
+                              onClick={() => handleFloorSelect(String(floor.id))}
+                              className={`flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-upred/5 ${
+                                selected ? "font-semibold text-upred" : "text-black"
+                              }`}
+                            >
+                              Floor {floor.floor_number}
+                              {selected && <Check className="h-4 w-4" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
 
-                  <div>
+                  <div className="relative">
                     <label className="mb-1 block text-sm font-medium">Room</label>
-                    <select
-                      name="room_id"
-                      value={form.room_id}
-                      onChange={handleChange}
+
+                    <button
+                      type="button"
                       disabled={!form.floor_id}
-                      className={`w-full rounded-lg border border-upred/30 p-3 ${
+                      onClick={() => {
+                        if (!form.floor_id) return;
+                        setShowRoomDropdown((prev) => !prev);
+                        setShowBuildingDropdown(false);
+                        setShowFloorDropdown(false);
+                      }}
+                      className={`flex w-full items-center justify-between rounded-lg border border-upred/30 p-3 text-left transition ${
                         !form.floor_id
                           ? "cursor-not-allowed bg-black/5 text-black/40"
-                          : "bg-white/90"
+                          : "bg-white/90 hover:border-upred/50"
                       }`}
                     >
-                      <option value="">No room selected</option>
-                      {rooms.map((room) => (
-                        <option key={room.id} value={room.id}>
-                          Room {room.room_number}
-                        </option>
-                      ))}
-                    </select>
+                      <span className={form.room_id ? "text-black" : "text-black/40"}>
+                        {selectedRoomName}
+                      </span>
+
+                      <ChevronDown
+                        className={`h-5 w-5 text-black/50 transition ${
+                          showRoomDropdown ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+
+                    {showRoomDropdown && (
+                      <div className="absolute left-0 right-0 z-40 mt-2 max-h-72 overflow-y-auto rounded-xl border border-upred/20 bg-white shadow-xl">
+                        <button
+                          type="button"
+                          onClick={() => handleRoomSelect("")}
+                          className={`flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-upred/5 ${
+                            !form.room_id ? "font-semibold text-upred" : "text-black"
+                          }`}
+                        >
+                          No room selected
+                          {!form.room_id && <Check className="h-4 w-4" />}
+                        </button>
+
+                        {rooms.map((room) => {
+                          const selected = String(room.id) === String(form.room_id);
+
+                          return (
+                            <button
+                              key={room.id}
+                              type="button"
+                              onClick={() => handleRoomSelect(String(room.id))}
+                              className={`flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-upred/5 ${
+                                selected ? "font-semibold text-upred" : "text-black"
+                              }`}
+                            >
+                              Room {room.room_number}
+                              {selected && <Check className="h-4 w-4" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
 
                   <div className="md:col-span-3">
                     <label className="mb-1 block text-sm font-medium">
-                      Title <span className="text-upred">*</span>
+                      Request Title <span className="text-upred">*</span>
                     </label>
+
                     <input
                       name="title"
                       value={form.title}
-                      onChange={handleChange}
-                      required
-                      placeholder="Request title"
-                      className="w-full rounded-lg border border-upred/30 bg-white/90 p-3"
+                      onChange={handleTextChange}
+                      placeholder="Enter request title"
+                      className="w-full rounded-lg border border-upred/30 bg-white/90 p-3 transition focus:border-upred focus:outline-none"
                     />
                   </div>
 
@@ -648,14 +827,14 @@ export default function ServiceRequests() {
                     <label className="mb-1 block text-sm font-medium">
                       Description <span className="text-upred">*</span>
                     </label>
+
                     <textarea
                       name="description"
                       value={form.description}
-                      onChange={handleChange}
-                      required
-                      rows={3}
-                      placeholder="Describe the concern or request"
-                      className="w-full resize-none rounded-lg border border-upred/30 bg-white/90 p-3"
+                      onChange={handleTextChange}
+                      placeholder="Describe the request"
+                      rows={5}
+                      className="w-full resize-none rounded-lg border border-upred/30 bg-white/90 p-3 transition focus:border-upred focus:outline-none"
                     />
                   </div>
                 </div>
@@ -663,7 +842,7 @@ export default function ServiceRequests() {
                 <div className="mt-6 flex flex-wrap justify-center gap-3">
                   <button
                     type="button"
-                    onClick={() => setShowRequestForm(false)}
+                    onClick={closeRequestForm}
                     disabled={submitting}
                     className="rounded-xl border border-upred/30 px-5 py-2 text-sm font-medium text-upred transition hover:bg-upred/10 disabled:opacity-50"
                   >
@@ -673,7 +852,7 @@ export default function ServiceRequests() {
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="rounded-xl bg-upred px-5 py-2 text-sm font-medium text-white transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-xl border border-upgreen/30 px-5 py-2 text-sm font-medium text-upgreen transition hover:bg-upgreen/10 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {submitting ? "Submitting..." : "Submit Request"}
                   </button>
@@ -697,11 +876,12 @@ export default function ServiceRequests() {
                 <label className="mb-1 block text-sm font-medium">
                   Search Requests
                 </label>
+
                 <input
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search by title, description, or building"
+                  placeholder="Search by title, description, building, or submitter"
                   className="w-full rounded-lg border border-upred/30 bg-white/90 p-3"
                 />
               </div>
@@ -710,7 +890,7 @@ export default function ServiceRequests() {
                 <button
                   type="button"
                   onClick={handleClearFilters}
-                  className="rounded-xl border border-upgreen/30 px-5 py-3 text-sm font-medium text-upgreen transition hover:bg-upgreen/10"
+                  className="rounded-xl border border-upred/30 px-5 py-3 text-sm font-medium text-upred transition hover:bg-upred/10"
                 >
                   Clear Filters
                 </button>
@@ -783,7 +963,9 @@ export default function ServiceRequests() {
                         </p>
 
                         <p>
-                          <span className="font-semibold text-black">Submitted By:</span>{" "}
+                          <span className="font-semibold text-black">
+                            Submitted By:
+                          </span>{" "}
                           {getSubmittedByLabel(request)}
                         </p>
                       </div>
