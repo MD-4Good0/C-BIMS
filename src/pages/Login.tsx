@@ -15,13 +15,81 @@ export default function Login() {
   const { showToast } = useToast();
 
   useEffect(() => {
-    function handleAuthMessage(event: MessageEvent) {
-      if (event.origin !== window.location.origin) return;
+    const isPopupWindow = Boolean(window.opener && window.opener !== window);
   
-      if (event.data?.type === "BIMS_AUTH_SUCCESS") {
-        setLoggingIn(false);
+    async function checkSession() {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+  
+      if (session) {
+        if (isPopupWindow) {
+          window.opener.postMessage(
+            {
+              type: "BIMS_AUTH_SUCCESS",
+            },
+            "*"
+          );
+  
+          window.close();
+          return;
+        }
+  
         navigate("/dashboard", { state: { fromLogin: true } });
       }
+    }
+  
+    checkSession();
+  
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        if (isPopupWindow) {
+          window.opener.postMessage(
+            {
+              type: "BIMS_AUTH_SUCCESS",
+            },
+            "*"
+          );
+  
+          window.close();
+          return;
+        }
+  
+        navigate("/dashboard", { state: { fromLogin: true } });
+      }
+    });
+  
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [navigate]);
+
+  const [fadeOverlay, setFadeOverlay] = useState(true);
+  const [loggingIn, setLoggingIn] = useState(false);
+
+  useEffect(() => {
+    function handleAuthMessage(event: MessageEvent) {
+      const isAllowedOrigin =
+        event.origin === window.location.origin ||
+        event.origin.endsWith(".vercel.app");
+  
+      if (!isAllowedOrigin) return;
+      if (event.data?.type !== "BIMS_AUTH_SUCCESS") return;
+  
+      supabase.auth.getSession().then(({ data }) => {
+        setLoggingIn(false);
+  
+        if (data.session) {
+          navigate("/dashboard", { state: { fromLogin: true } });
+        } else {
+          showToast(
+            "Login finished, but the session was not found. Check the Supabase redirect URL.",
+            "error"
+          );
+        }
+      });
     }
   
     window.addEventListener("message", handleAuthMessage);
@@ -29,10 +97,7 @@ export default function Login() {
     return () => {
       window.removeEventListener("message", handleAuthMessage);
     };
-  }, [navigate]);
-
-  const [fadeOverlay, setFadeOverlay] = useState(true);
-  const [loggingIn, setLoggingIn] = useState(false);
+  }, [navigate, showToast]);
 
   useEffect(() => {
     const timer = setTimeout(() => setFadeOverlay(false), 600);
@@ -44,31 +109,46 @@ export default function Login() {
     const height = 600;
     const left = window.screen.width / 2 - width / 2;
     const top = window.screen.height / 2 - height / 2;
-  
+
     setLoggingIn(true);
-  
+
     const redirectTo = `${window.location.origin}/popup-callback`;
-  
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo,
+        skipBrowserRedirect: true,
+      },
+    });
+
+    if (error || !data.url) {
+      console.error(error);
+      setLoggingIn(false);
+      showToast(error?.message || "Failed to start Google login.", "error");
+      return;
+    }
+
     const popup = window.open(
-      `https://quqwbezmlozyxrerljhd.supabase.co/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(
-        redirectTo
-      )}`,
+      data.url,
       "GoogleLogin",
       `width=${width},height=${height},top=${top},left=${left}`
     );
-  
+
     if (!popup) {
       setLoggingIn(false);
       showToast("Popup was blocked. Please allow popups and try again.", "warning");
       return;
     }
-  
+
     const pollPopup = setInterval(() => {
       if (popup.closed) {
         clearInterval(pollPopup);
-  
+
         supabase.auth.getSession().then(({ data }) => {
-          if (!data.session) {
+          if (data.session) {
+            navigate("/dashboard", { state: { fromLogin: true } });
+          } else {
             setLoggingIn(false);
           }
         });
