@@ -274,14 +274,6 @@ function buildWorksheetRows(rows: any[], fields: ReportField[]) {
   });
 }
 
-function escapeHtml(value: any) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
 export function exportCombinedReportToCSV(
   rows: any[],
   buildingFields: ReportField[],

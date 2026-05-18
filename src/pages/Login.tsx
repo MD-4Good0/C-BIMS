@@ -53,31 +53,32 @@ export default function Login() {
     const height = 600;
     const left = window.screen.width / 2 - width / 2;
     const top = window.screen.height / 2 - height / 2;
-
+  
     setLoggingIn(true);
-
+  
+    const redirectTo = `${window.location.origin}/popup-callback`;
+  
     const popup = window.open(
       `https://quqwbezmlozyxrerljhd.supabase.co/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(
-        "https://c-bims.vercel.app//popup-callback"
+        redirectTo
       )}`,
       "GoogleLogin",
       `width=${width},height=${height},top=${top},left=${left}`
     );
-
+  
     if (!popup) {
       setLoggingIn(false);
       showToast("Popup was blocked. Please allow popups and try again.", "warning");
       return;
     }
-
+  
     const pollPopup = setInterval(() => {
       if (popup.closed) {
         clearInterval(pollPopup);
-
+  
         supabase.auth.getSession().then(({ data }) => {
           if (!data.session) {
             setLoggingIn(false);
-            showToast("Failed to authenticate with Google.", "error");
           }
         });
       }
