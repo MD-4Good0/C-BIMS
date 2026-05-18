@@ -7,6 +7,7 @@ import {
   createCollege,
   updateCollege,
   deleteCollege,
+  getCollegeBuildingCount,
 } from "../colleges";
 import { getCurrentUserRole } from "../auth";
 import { useToast } from "../components/ToastProvider";
@@ -57,14 +58,28 @@ export default function AdminColleges() {
     setColleges(data || []);
   }
 
+  function collegeNameExists(name: string, ignoredId?: number) {
+    const normalized = name.trim().toLowerCase();
+  
+    return colleges.some((college) => {
+      if (ignoredId && college.id === ignoredId) return false;
+      return String(college.name || "").trim().toLowerCase() === normalized;
+    });
+  }
+
   async function handleCreate() {
     const name = newCollege.trim();
-
+  
     if (!name) {
       showToast("College name cannot be empty", "warning");
       return;
     }
-
+  
+    if (collegeNameExists(name)) {
+      showToast("That college already exists", "warning");
+      return;
+    }
+  
     try {
       setProcessing(true);
       await createCollege(name);
@@ -88,14 +103,19 @@ export default function AdminColleges() {
 
   async function handleUpdate() {
     if (!editModal) return;
-
+  
     const name = editModal.name.trim();
-
+  
     if (!name) {
       showToast("College name cannot be empty", "warning");
       return;
     }
-
+  
+    if (collegeNameExists(name, editModal.id)) {
+      showToast("That college already exists", "warning");
+      return;
+    }
+  
     try {
       setProcessing(true);
       await updateCollege(editModal.id, name);
@@ -110,15 +130,32 @@ export default function AdminColleges() {
     }
   }
 
-  function requestDelete(college: any) {
-    setConfirmModal({
-      title: "Delete college?",
-      message: `Are you sure you want to delete ${college.name}?`,
-      onConfirm: async () => {
-        await deleteCollege(college.id);
-        await load();
-      },
-    });
+  async function requestDelete(college: any) {
+    try {
+      const buildingCount = await getCollegeBuildingCount(college.id);
+  
+      if (buildingCount > 0) {
+        showToast(
+          `Cannot delete this college because ${buildingCount} building${
+            buildingCount !== 1 ? "s are" : " is"
+          } still assigned to it.`,
+          "warning"
+        );
+        return;
+      }
+  
+      setConfirmModal({
+        title: "Delete college?",
+        message: `Are you sure you want to delete ${college.name}?`,
+        onConfirm: async () => {
+          await deleteCollege(college.id);
+          await load();
+        },
+      });
+    } catch (err: any) {
+      console.error(err);
+      showToast(err.message || "Failed to check college usage", "error");
+    }
   }
 
   async function handleConfirmAction() {

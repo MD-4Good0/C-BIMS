@@ -1,12 +1,23 @@
+import { Link } from "react-router-dom";
+
 export default function NotRegistered() {
   return (
-    <div className="flex h-screen items-center justify-center bg-black text-white">
-      <div className="bg-white text-black p-8 rounded-lg text-center">
-        <h1 className="text-xl font-bold mb-2">Access Denied</h1>
-        <p className="mb-4">Your account is not registered in the system.</p>
-        <p className="text-sm text-gray-500">
-          Please contact an administrator to request access.
+    <div className="flex min-h-screen items-center justify-center bg-black px-6 text-white">
+      <div className="w-full max-w-md rounded-2xl border border-white/20 bg-white/95 p-8 text-center text-black shadow-xl">
+        <h1 className="mb-2 text-2xl font-extrabold text-upred">
+          Access Required
+        </h1>
+
+        <p className="mb-4 text-sm text-black/70">
+          Your account is not yet approved for the system.
         </p>
+
+        <Link
+          to="/request-access"
+          className="inline-flex rounded-xl bg-upred px-5 py-2 text-sm font-medium text-white transition hover:scale-105"
+        >
+          Request Access
+        </Link>
       </div>
     </div>
   );

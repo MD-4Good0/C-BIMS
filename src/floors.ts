@@ -21,6 +21,17 @@ export async function createFloor(buildingId: number, floorNumber: number) {
   return data;
 }
 
+export async function updateFloor(id: number, floorNumber: number) {
+  const { data, error } = await supabase
+    .from("floors")
+    .update({ floor_number: floorNumber })
+    .eq("id", id)
+    .select();
+
+  if (error) throw error;
+  return data;
+}
+
 export async function deleteFloor(id: number) {
   const { error } = await supabase
     .from("floors")

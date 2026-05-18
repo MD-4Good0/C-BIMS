@@ -1,7 +1,7 @@
 import { supabase } from "./supabaseClient";
 
 export async function getServiceRequests() {
-  const { data, error } = await supabase
+  const { data: requests, error: requestsError } = await supabase
     .from("service_requests")
     .select(`
       *,
@@ -20,8 +20,35 @@ export async function getServiceRequests() {
     `)
     .order("created_at", { ascending: false });
 
-  if (error) throw error;
-  return data;
+  if (requestsError) throw requestsError;
+
+  const submittedByIds = Array.from(
+    new Set(
+      (requests || [])
+        .map((request) => request.submitted_by)
+        .filter(Boolean)
+    )
+  );
+
+  if (submittedByIds.length === 0) {
+    return requests || [];
+  }
+
+  const { data: profiles, error: profilesError } = await supabase
+    .from("profiles")
+    .select("id, full_name, email")
+    .in("id", submittedByIds);
+
+  if (profilesError) throw profilesError;
+
+  const profilesById = new Map(
+    (profiles || []).map((profile) => [profile.id, profile])
+  );
+
+  return (requests || []).map((request) => ({
+    ...request,
+    profiles: profilesById.get(request.submitted_by) || null,
+  }));
 }
 
 export async function createServiceRequest(payload: {

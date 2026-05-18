@@ -13,7 +13,7 @@ import {
 } from "../adminUsers";
 import { useToast } from "../components/ToastProvider";
 
-type UserRole = "staff" | "chief";
+type UserRole = "staff" | "chief" | "admin";
 type UserView = "pending" | "approved" | "rejected";
 
 export default function AdminUsers() {
@@ -108,7 +108,9 @@ export default function AdminUsers() {
 
         (merged || []).forEach((user) => {
           if (!next[user.id]) {
-            next[user.id] = user.role === "chief" ? "chief" : "staff";
+            if (user.role === "admin") next[user.id] = "admin";
+            else if (user.role === "chief") next[user.id] = "chief";
+            else next[user.id] = "staff";
           }
         });
 
@@ -419,9 +421,7 @@ export default function AdminUsers() {
                             <div className="inline-flex overflow-hidden rounded-xl border border-upred/30 bg-white">
                               <button
                                 type="button"
-                                onClick={() =>
-                                  handleRoleSelection(user.id, "staff")
-                                }
+                                onClick={() => handleRoleSelection(user.id, "staff")}
                                 className={`px-4 py-2 text-sm font-medium transition ${
                                   (roleSelections[user.id] || "staff") === "staff"
                                     ? "bg-upred text-white"
@@ -433,9 +433,7 @@ export default function AdminUsers() {
 
                               <button
                                 type="button"
-                                onClick={() =>
-                                  handleRoleSelection(user.id, "chief")
-                                }
+                                onClick={() => handleRoleSelection(user.id, "chief")}
                                 className={`px-4 py-2 text-sm font-medium transition ${
                                   roleSelections[user.id] === "chief"
                                     ? "bg-upred text-white"
@@ -443,6 +441,18 @@ export default function AdminUsers() {
                                 }`}
                               >
                                 Chief
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleRoleSelection(user.id, "admin")}
+                                className={`px-4 py-2 text-sm font-medium transition ${
+                                  roleSelections[user.id] === "admin"
+                                    ? "bg-upred text-white"
+                                    : "text-upred hover:bg-upred/10"
+                                }`}
+                              >
+                                Admin
                               </button>
                             </div>
 

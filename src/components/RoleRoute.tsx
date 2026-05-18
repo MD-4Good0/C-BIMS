@@ -7,16 +7,25 @@ type RoleRouteProps = {
   allowedRoles: string[];
 };
 
+type RoleAccessState = {
+  loading: boolean;
+  hasSession: boolean;
+  approved: boolean;
+  role: string | null;
+};
+
 export default function RoleRoute({ children, allowedRoles }: RoleRouteProps) {
-  const [loading, setLoading] = useState(true);
-  const [hasSession, setHasSession] = useState(false);
-  const [approved, setApproved] = useState(false);
-  const [role, setRole] = useState<string | null>(null);
+  const [access, setAccess] = useState<RoleAccessState>({
+    loading: true,
+    hasSession: false,
+    approved: false,
+    role: null,
+  });
 
   useEffect(() => {
     let mounted = true;
 
-    async function load() {
+    async function checkAccess() {
       try {
         const {
           data: { session },
@@ -25,18 +34,22 @@ export default function RoleRoute({ children, allowedRoles }: RoleRouteProps) {
         if (!mounted) return;
 
         if (!session?.user) {
-          setHasSession(false);
-          setApproved(false);
-          setRole(null);
-          setLoading(false);
+          sessionStorage.removeItem("bims_role");
+          sessionStorage.removeItem("bims_full_name");
+
+          setAccess({
+            loading: false,
+            hasSession: false,
+            approved: false,
+            role: null,
+          });
+
           return;
         }
 
-        setHasSession(true);
-
         const { data: profile, error } = await supabase
           .from("profiles")
-          .select("role, status")
+          .select("role, status, full_name")
           .eq("id", session.user.id)
           .maybeSingle();
 
@@ -44,61 +57,65 @@ export default function RoleRoute({ children, allowedRoles }: RoleRouteProps) {
 
         if (error) {
           console.error("RoleRoute profile check error:", error);
-          setApproved(false);
-          setRole(null);
-          setLoading(false);
+
+          sessionStorage.removeItem("bims_role");
+          sessionStorage.removeItem("bims_full_name");
+
+          setAccess({
+            loading: false,
+            hasSession: true,
+            approved: false,
+            role: null,
+          });
+
           return;
         }
 
-        setApproved(profile?.status === "approved");
-        setRole(profile?.role ?? null);
-        setLoading(false);
+        const approved = profile?.status === "approved" && Boolean(profile?.role);
+        const role = profile?.role ?? null;
+
+        if (approved && role) {
+          sessionStorage.setItem("bims_role", role);
+
+          if (profile.full_name) {
+            sessionStorage.setItem("bims_full_name", profile.full_name);
+          } else {
+            sessionStorage.removeItem("bims_full_name");
+          }
+        } else {
+          sessionStorage.removeItem("bims_role");
+          sessionStorage.removeItem("bims_full_name");
+        }
+
+        setAccess({
+          loading: false,
+          hasSession: true,
+          approved,
+          role,
+        });
       } catch (err) {
-        console.error("RoleRoute load error:", err);
+        console.error("RoleRoute access check failed:", err);
+
         if (!mounted) return;
-        setHasSession(false);
-        setApproved(false);
-        setRole(null);
-        setLoading(false);
+
+        sessionStorage.removeItem("bims_role");
+        sessionStorage.removeItem("bims_full_name");
+
+        setAccess({
+          loading: false,
+          hasSession: false,
+          approved: false,
+          role: null,
+        });
       }
     }
 
-    load();
+    checkAccess();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
-      if (!mounted) return;
-
-      if (!newSession?.user) {
-        setHasSession(false);
-        setApproved(false);
-        setRole(null);
-        setLoading(false);
-        return;
-      }
-
-      setHasSession(true);
-
-      const { data: profile, error } = await supabase
-        .from("profiles")
-        .select("role, status")
-        .eq("id", newSession.user.id)
-        .maybeSingle();
-
-      if (!mounted) return;
-
-      if (error) {
-        console.error("RoleRoute auth change profile check error:", error);
-        setApproved(false);
-        setRole(null);
-        setLoading(false);
-        return;
-      }
-
-      setApproved(profile?.status === "approved");
-      setRole(profile?.role ?? null);
-      setLoading(false);
+    } = supabase.auth.onAuthStateChange(() => {
+      checkAccess();
     });
 
     return () => {
@@ -107,23 +124,23 @@ export default function RoleRoute({ children, allowedRoles }: RoleRouteProps) {
     };
   }, []);
 
-  if (loading) {
+  if (access.loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white text-black">
-        Loading...
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent" />
       </div>
     );
   }
 
-  if (!hasSession) {
+  if (!access.hasSession) {
     return <Navigate to="/" replace />;
   }
 
-  if (!approved) {
+  if (!access.approved) {
     return <Navigate to="/request-access" replace />;
   }
 
-  if (!role || !allowedRoles.includes(role)) {
+  if (!access.role || !allowedRoles.includes(access.role)) {
     return <Navigate to="/dashboard" replace />;
   }
 

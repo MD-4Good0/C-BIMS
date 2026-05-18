@@ -21,8 +21,9 @@ export default function ProfileModal({ open, onClose }: ProfileModalProps) {
   const [role, setRole] = useState("");
   const [status, setStatus] = useState<ProfileStatus>("");
   const [requestedRole, setRequestedRole] = useState<"staff" | "chief">("staff");
+
   const { showToast } = useToast();
-  
+
   useEffect(() => {
     if (open) {
       loadProfile();
@@ -38,7 +39,12 @@ export default function ProfileModal({ open, onClose }: ProfileModalProps) {
       } = await supabase.auth.getUser();
 
       if (!user) {
-        setLoading(false);
+        setUserId(null);
+        setEmail("");
+        setFullName("");
+        setRole("");
+        setStatus("");
+        setRequestedRole("staff");
         return;
       }
 
@@ -58,23 +64,32 @@ export default function ProfileModal({ open, onClose }: ProfileModalProps) {
       }
 
       if (data) {
-        setFullName(data.full_name || "");
-        setRole(data.role || "");
-        setStatus((data.status as ProfileStatus) || "");
-        setRequestedRole(data.role === "chief" ? "chief" : "staff");
+        const loadedName = data.full_name || "";
+        const loadedRole = data.role || "";
+        const loadedStatus = (data.status as ProfileStatus) || "";
 
-        if (data.full_name) {
-          sessionStorage.setItem("bims_full_name", data.full_name);
+        setFullName(loadedName);
+        setRole(loadedRole);
+        setStatus(loadedStatus);
+        setRequestedRole(loadedRole === "chief" ? "chief" : "staff");
+
+        if (loadedName) {
+          sessionStorage.setItem("bims_full_name", loadedName);
+        } else {
+          sessionStorage.removeItem("bims_full_name");
         }
 
-        if (data.role) {
-          sessionStorage.setItem("bims_role", data.role);
+        if (loadedStatus === "approved" && loadedRole) {
+          sessionStorage.setItem("bims_role", loadedRole);
+        } else {
+          sessionStorage.removeItem("bims_role");
         }
       } else {
         setFullName("");
         setRole("");
         setStatus("");
         setRequestedRole("staff");
+        sessionStorage.removeItem("bims_role");
       }
     } catch (err) {
       console.error("Failed to load profile:", err);
@@ -130,6 +145,14 @@ export default function ProfileModal({ open, onClose }: ProfileModalProps) {
   async function handleRequestRoleChange() {
     if (!userId) return;
 
+    if (status === "approved") {
+      showToast(
+        "Approved users cannot change their role from the profile modal. Ask an admin to change it.",
+        "warning"
+      );
+      return;
+    }
+
     try {
       setSaving(true);
 
@@ -158,7 +181,11 @@ export default function ProfileModal({ open, onClose }: ProfileModalProps) {
 
       if (trimmedName) {
         sessionStorage.setItem("bims_full_name", trimmedName);
+      } else {
+        sessionStorage.removeItem("bims_full_name");
       }
+
+      sessionStorage.removeItem("bims_role");
 
       showToast("Role request submitted", "success");
       await loadProfile();
@@ -171,9 +198,18 @@ export default function ProfileModal({ open, onClose }: ProfileModalProps) {
   }
 
   function getStatusClass() {
-    if (status === "approved") return "border-upgreen/20 bg-upgreen/10 text-upgreen";
-    if (status === "pending") return "border-upyellow/30 bg-upyellow/20 text-black";
-    if (status === "rejected") return "border-upred/20 bg-upred/10 text-upred";
+    if (status === "approved") {
+      return "border-upgreen/20 bg-upgreen/10 text-upgreen";
+    }
+
+    if (status === "pending") {
+      return "border-upyellow/30 bg-upyellow/20 text-black";
+    }
+
+    if (status === "rejected") {
+      return "border-upred/20 bg-upred/10 text-upred";
+    }
+
     return "border-black/10 bg-black/5 text-black/60";
   }
 
@@ -182,6 +218,10 @@ export default function ProfileModal({ open, onClose }: ProfileModalProps) {
     if (role === "chief") return "Chief";
     if (role === "admin") return "Admin";
     return "No role assigned";
+  }
+
+  function canSubmitRoleRequest() {
+    return status !== "approved";
   }
 
   return (
@@ -217,7 +257,7 @@ export default function ProfileModal({ open, onClose }: ProfileModalProps) {
                 Profile
               </h1>
               <p className="mt-2 text-sm text-black/60">
-                Manage your display name and access request.
+                Manage your display name and view your access status.
               </p>
             </div>
 
@@ -281,8 +321,11 @@ export default function ProfileModal({ open, onClose }: ProfileModalProps) {
                     <h2 className="text-lg font-bold text-upred">
                       Role Request
                     </h2>
+
                     <p className="mt-1 text-sm text-black/60">
-                      Request staff or chief access for admin review.
+                      {canSubmitRoleRequest()
+                        ? "Request staff or chief access for admin review."
+                        : "Your account is already approved. Ask an admin if your role needs to be changed."}
                     </p>
                   </div>
 
@@ -291,7 +334,8 @@ export default function ProfileModal({ open, onClose }: ProfileModalProps) {
                       <button
                         type="button"
                         onClick={() => setRequestedRole("staff")}
-                        className={`px-5 py-2 text-sm font-medium transition ${
+                        disabled={!canSubmitRoleRequest() || saving}
+                        className={`px-5 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
                           requestedRole === "staff"
                             ? "bg-upred text-white"
                             : "text-upred hover:bg-upred/10"
@@ -303,7 +347,8 @@ export default function ProfileModal({ open, onClose }: ProfileModalProps) {
                       <button
                         type="button"
                         onClick={() => setRequestedRole("chief")}
-                        className={`px-5 py-2 text-sm font-medium transition ${
+                        disabled={!canSubmitRoleRequest() || saving}
+                        className={`px-5 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
                           requestedRole === "chief"
                             ? "bg-upred text-white"
                             : "text-upred hover:bg-upred/10"
@@ -316,7 +361,7 @@ export default function ProfileModal({ open, onClose }: ProfileModalProps) {
                     <button
                       type="button"
                       onClick={handleRequestRoleChange}
-                      disabled={saving}
+                      disabled={saving || !canSubmitRoleRequest()}
                       className="rounded-xl border border-upgreen/30 px-5 py-2 text-sm font-medium text-upgreen transition hover:bg-upgreen/10 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {saving ? "Submitting..." : "Submit Role Request"}

@@ -21,6 +21,17 @@ export async function createRoom(floorId: number, roomNumber: string) {
   return data;
 }
 
+export async function updateRoom(id: number, roomNumber: string) {
+  const { data, error } = await supabase
+    .from("rooms")
+    .update({ room_number: roomNumber })
+    .eq("id", id)
+    .select();
+
+  if (error) throw error;
+  return data;
+}
+
 export async function deleteRoom(id: number) {
   const { error } = await supabase
     .from("rooms")

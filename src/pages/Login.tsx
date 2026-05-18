@@ -14,6 +14,35 @@ export default function Login() {
 
   const { showToast } = useToast();
 
+  async function redirectAfterLogin(fromLogin = true) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+  
+    if (!session?.user) return;
+  
+    const { data: profile, error } = await supabase
+      .from("profiles")
+      .select("role, status")
+      .eq("id", session.user.id)
+      .maybeSingle();
+  
+    if (error) {
+      console.error("Login profile check error:", error);
+      navigate("/request-access");
+      return;
+    }
+  
+    if (profile?.status === "approved" && profile?.role) {
+      sessionStorage.setItem("bims_role", profile.role);
+      navigate("/dashboard", { state: { fromLogin } });
+      return;
+    }
+  
+    sessionStorage.removeItem("bims_role");
+    navigate("/request-access");
+  }
+
   useEffect(() => {
     const isPopupWindow = Boolean(window.opener && window.opener !== window);
   
@@ -35,7 +64,7 @@ export default function Login() {
           return;
         }
   
-        navigate("/dashboard", { state: { fromLogin: true } });
+        redirectAfterLogin(true);
       }
     }
   
@@ -57,7 +86,7 @@ export default function Login() {
           return;
         }
   
-        navigate("/dashboard", { state: { fromLogin: true } });
+        redirectAfterLogin(true);
       }
     });
   
@@ -82,7 +111,7 @@ export default function Login() {
         setLoggingIn(false);
   
         if (data.session) {
-          navigate("/dashboard", { state: { fromLogin: true } });
+          redirectAfterLogin(true);
         } else {
           showToast(
             "Login finished, but the session was not found. Check the Supabase redirect URL.",
@@ -147,7 +176,7 @@ export default function Login() {
 
         supabase.auth.getSession().then(({ data }) => {
           if (data.session) {
-            navigate("/dashboard", { state: { fromLogin: true } });
+            redirectAfterLogin(true);
           } else {
             setLoggingIn(false);
           }

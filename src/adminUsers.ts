@@ -1,9 +1,11 @@
 import { supabase } from "./supabaseClient";
 
+export type ManagedUserRole = "admin" | "staff" | "chief";
+
 export async function getPendingUsers() {
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, email, role, status, created_at")
+    .select("id, email, role, status, created_at, full_name")
     .eq("status", "pending")
     .order("created_at", { ascending: false });
 
@@ -14,14 +16,14 @@ export async function getPendingUsers() {
 export async function getAllUsers() {
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, email, role, status, created_at")
+    .select("id, email, role, status, created_at, full_name")
     .order("created_at", { ascending: false });
 
   if (error) throw error;
   return data;
 }
 
-export async function approveUser(id: string, role: "staff" | "chief") {
+export async function approveUser(id: string, role: ManagedUserRole) {
   const { data, error } = await supabase
     .from("profiles")
     .update({

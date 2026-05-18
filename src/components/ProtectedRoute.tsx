@@ -62,10 +62,9 @@ export default function ProtectedRoute({ children }: { children: ReactNode }) {
           return;
         }
 
-        const isApproved =
-          profile?.status === "approved" && Boolean(profile?.role);
+        const approved = profile?.status === "approved" && Boolean(profile?.role);
 
-        if (isApproved) {
+        if (approved) {
           sessionStorage.setItem("bims_role", profile.role);
 
           if (profile.full_name) {
@@ -81,7 +80,7 @@ export default function ProtectedRoute({ children }: { children: ReactNode }) {
         setAccess({
           loading: false,
           hasSession: true,
-          approved: isApproved,
+          approved,
         });
       } catch (err) {
         console.error("ProtectedRoute access check failed:", err);

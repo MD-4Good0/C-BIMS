@@ -24,128 +24,156 @@ export const buildingReportFields: ReportField[] = [
   { key: "building_name", label: "Building Name" },
   { key: "college", label: "College" },
   { key: "num_floors", label: "Number of Floors" },
-  { key: "footprint", label: "Footprint" },
-  { key: "total_floor_area", label: "Total Floor Area" },
-  { key: "renovated_bool", label: "Renovated" },
-  { key: "renovated_area", label: "Renovated Area" },
-  { key: "ongoing_renovation", label: "Ongoing Renovation" },
-  { key: "ongoing_renovation_area", label: "Ongoing Renovation Area" },
-  { key: "future_renovation", label: "Future Renovation" },
+  { key: "footprint", label: "Building Footprint (sqm)" },
+  { key: "total_floor_area", label: "Total Floor Area (sqm)" },
+  { key: "renovated_bool", label: "Renovated Areas" },
+  { key: "renovated_area", label: "Total Floor Area for Renovated Works" },
+  { key: "ongoing_renovation", label: "On-going Renovations" },
+  { key: "ongoing_renovation_area", label: "Total Floor Area for On-going Work" },
+  { key: "future_renovation", label: "For Future Renovation" },
   { key: "cost_per_sqm", label: "Cost per SQM" },
-  { key: "proposed_dev_cost", label: "Proposed Development Cost" },
-  { key: "structural_integrity", label: "Structural Integrity" },
+  { key: "proposed_dev_cost", label: "Proposed Development Cost for Future Renovations" },
+  { key: "structural_integrity", label: "Structural Integrity Assessment" },
   { key: "retrofitting", label: "Retrofitting" },
   { key: "repainting", label: "Repainting" },
   { key: "ramp", label: "Ramp" },
   { key: "elevator", label: "Elevator" },
-  { key: "pwd_restroom", label: "PWD Restroom" },
+  { key: "pwd_restroom", label: "PWD Rest Room" },
   { key: "gender_neutral_restroom", label: "Gender Neutral Restroom" },
-  { key: "building_permit_date", label: "Building Permit Date" },
-  { key: "occupancy_permit_date", label: "Occupancy Permit Date" },
-  { key: "elevator_permit_issue", label: "Elevator Permit Issue" },
-  { key: "elevator_permit_expiration", label: "Elevator Permit Expiration" },
+  { key: "building_permit_date", label: "Building Permit Date Issued" },
+  { key: "occupancy_permit_date", label: "Occupancy Permit Date Issued" },
+  { key: "elevator_permit_issue", label: "Elevator Permit Issue Date" },
+  { key: "elevator_permit_expiration", label: "Elevator Permit Expiration Date" },
   { key: "generator", label: "Generator" },
   { key: "generator_issue_date", label: "Generator Issue Date" },
   { key: "generator_expiration_date", label: "Generator Expiration Date" },
   { key: "cistern", label: "Cistern" },
   { key: "septic_tank", label: "Septic Tank" },
-  { key: "electrical_wiring", label: "Electrical Wiring" },
-  { key: "lvsg", label: "LVSG" },
+  { key: "electrical_wiring", label: "Upgraded Electrical Wiring" },
+  { key: "lvsg", label: "Upgraded Electrical Connection LVSG" },
   { key: "fdas", label: "FDAS" },
-  { key: "fire_protection", label: "Fire Protection" },
+  { key: "fire_protection", label: "Fire Protection System" },
   { key: "ventilation", label: "Ventilation" },
-  { key: "fiber_lan", label: "Fiber LAN" },
+  { key: "fiber_lan", label: "Fiber Optics / Structured Cabling / LAN" },
   { key: "cmr_submission", label: "CMR Submission" },
   { key: "smr_submission", label: "SMR Submission" },
   { key: "testing_requirements", label: "Testing Requirements" },
   { key: "has_attachment", label: "Has Attachment" },
-  { key: "file_link", label: "File Link" },
+  { key: "file_link", label: "File Link / Path" },
 ];
 
 export const complianceReportFields: ReportField[] = [
   { key: "building_name", label: "Building Name" },
   { key: "college", label: "College" },
-  { key: "num_floors", label: "Number of Floors" },
-  { key: "footprint", label: "Footprint" },
-  { key: "total_floor_area", label: "Total Floor Area" },
-  { key: "renovated_bool", label: "Renovated" },
-  { key: "renovated_area", label: "Renovated Area" },
-  { key: "ongoing_renovation", label: "Ongoing Renovation" },
-  { key: "ongoing_renovation_area", label: "Ongoing Renovation Area" },
-  { key: "future_renovation", label: "Future Renovation" },
-  { key: "structural_integrity", label: "Structural Integrity" },
+  { key: "renovated_bool", label: "Renovated Areas" },
+  { key: "renovated_area", label: "Total Floor Area for Renovated Works" },
+  { key: "ongoing_renovation", label: "On-going Renovations" },
+  { key: "ongoing_renovation_area", label: "Total Floor Area for On-going Work" },
+  { key: "future_renovation", label: "For Future Renovation" },
+  { key: "cost_per_sqm", label: "Cost per SQM" },
+  { key: "proposed_dev_cost", label: "Proposed Development Cost for Future Renovations" },
+  { key: "structural_integrity", label: "Structural Integrity Assessment" },
   { key: "retrofitting", label: "Retrofitting" },
   { key: "repainting", label: "Repainting" },
   { key: "ramp", label: "Ramp" },
   { key: "elevator", label: "Elevator" },
-  { key: "pwd_restroom", label: "PWD Restroom" },
+  { key: "pwd_restroom", label: "PWD Rest Room" },
   { key: "gender_neutral_restroom", label: "Gender Neutral Restroom" },
+  { key: "building_permit_date", label: "Building Permit Date Issued" },
+  { key: "occupancy_permit_date", label: "Occupancy Permit Date Issued" },
+  { key: "elevator_permit_issue", label: "Elevator Permit Issue Date" },
+  { key: "elevator_permit_expiration", label: "Elevator Permit Expiration Date" },
   { key: "generator", label: "Generator" },
   { key: "generator_issue_date", label: "Generator Issue Date" },
   { key: "generator_expiration_date", label: "Generator Expiration Date" },
-  { key: "electrical_wiring", label: "Electrical Wiring" },
-  { key: "lvsg", label: "LVSG" },
+  { key: "cistern", label: "Cistern" },
+  { key: "septic_tank", label: "Septic Tank" },
+  { key: "electrical_wiring", label: "Upgraded Electrical Wiring" },
+  { key: "lvsg", label: "Upgraded Electrical Connection LVSG" },
   { key: "fdas", label: "FDAS" },
-  { key: "fire_protection", label: "Fire Protection" },
+  { key: "fire_protection", label: "Fire Protection System" },
   { key: "ventilation", label: "Ventilation" },
-  { key: "fiber_lan", label: "Fiber LAN" },
+  { key: "fiber_lan", label: "Fiber Optics / Structured Cabling / LAN" },
   { key: "cmr_submission", label: "CMR Submission" },
   { key: "smr_submission", label: "SMR Submission" },
   { key: "testing_requirements", label: "Testing Requirements" },
   { key: "has_attachment", label: "Has Attachment" },
-  { key: "file_link", label: "File Link" },
+  { key: "file_link", label: "File Link / Path" },
 ];
 
 export const complianceReportGroups: ReportGroup[] = [
   {
-    title: "Building Information",
+    title: "Building Conditions",
     fields: [
-      { key: "building_name", label: "Building Name" },
-      { key: "college", label: "College" },
-      { key: "num_floors", label: "Number of Floors" },
-      { key: "footprint", label: "Footprint" },
-      { key: "total_floor_area", label: "Total Floor Area" },
+      { key: "renovated_bool", label: "Renovated Areas" },
+      { key: "renovated_area", label: "Total Floor Area for Renovated Works" },
+      { key: "ongoing_renovation", label: "On-going Renovations" },
+      { key: "ongoing_renovation_area", label: "Total Floor Area for On-going Work" },
+      { key: "future_renovation", label: "For Future Renovation" },
     ],
   },
   {
-    title: "Building Conditions",
+    title: "Projected Renovation Cost",
     fields: [
-      { key: "renovated_bool", label: "Renovated" },
-      { key: "renovated_area", label: "Renovated Area" },
-      { key: "ongoing_renovation", label: "Ongoing Renovation" },
-      { key: "ongoing_renovation_area", label: "Ongoing Renovation Area" },
-      { key: "future_renovation", label: "Future Renovation" },
-      { key: "structural_integrity", label: "Structural Integrity" },
+      { key: "cost_per_sqm", label: "Cost per SQM" },
+      { key: "proposed_dev_cost", label: "Proposed Development Cost for Future Renovations" },
+    ],
+  },
+  {
+    title: "Structural Requirements",
+    fields: [
+      { key: "structural_integrity", label: "Structural Integrity Assessment" },
       { key: "retrofitting", label: "Retrofitting" },
       { key: "repainting", label: "Repainting" },
     ],
   },
   {
-    title: "Accessibility and Safety",
+    title: "PWD and Gender-Neutral Compliance",
     fields: [
       { key: "ramp", label: "Ramp" },
       { key: "elevator", label: "Elevator" },
-      { key: "pwd_restroom", label: "PWD Restroom" },
+      { key: "pwd_restroom", label: "PWD Rest Room" },
       { key: "gender_neutral_restroom", label: "Gender Neutral Restroom" },
-      { key: "fdas", label: "FDAS" },
-      { key: "fire_protection", label: "Fire Protection" },
-      { key: "ventilation", label: "Ventilation" },
     ],
   },
   {
-    title: "Equipment and Requirements",
+    title: "Permits Availability and Relevant Dates",
     fields: [
-      { key: "generator", label: "Generator" },
+      { key: "building_permit_date", label: "Building Permit Date Issued" },
+      { key: "occupancy_permit_date", label: "Occupancy Permit Date Issued" },
+      { key: "elevator_permit_issue", label: "Elevator Permit Issue Date" },
+      { key: "elevator_permit_expiration", label: "Elevator Permit Expiration Date" },
       { key: "generator_issue_date", label: "Generator Issue Date" },
       { key: "generator_expiration_date", label: "Generator Expiration Date" },
-      { key: "electrical_wiring", label: "Electrical Wiring" },
-      { key: "lvsg", label: "LVSG" },
-      { key: "fiber_lan", label: "Fiber LAN" },
+    ],
+  },
+  {
+    title: "Utilities",
+    fields: [
+      { key: "generator", label: "Generator" },
+      { key: "cistern", label: "Cistern" },
+      { key: "septic_tank", label: "Septic Tank" },
+      { key: "electrical_wiring", label: "Upgraded Electrical Wiring" },
+      { key: "lvsg", label: "Upgraded Electrical Connection LVSG" },
+      { key: "fdas", label: "FDAS" },
+      { key: "fire_protection", label: "Fire Protection System" },
+      { key: "ventilation", label: "Ventilation" },
+      { key: "fiber_lan", label: "Fiber Optics / Structured Cabling / LAN" },
+    ],
+  },
+  {
+    title: "Environmental Compliance",
+    fields: [
       { key: "cmr_submission", label: "CMR Submission" },
       { key: "smr_submission", label: "SMR Submission" },
       { key: "testing_requirements", label: "Testing Requirements" },
+    ],
+  },
+  {
+    title: "Attachments",
+    fields: [
       { key: "has_attachment", label: "Has Attachment" },
-      { key: "file_link", label: "File Link" },
+      { key: "file_link", label: "File Link / Path" },
     ],
   },
 ];
@@ -331,25 +359,6 @@ export function exportCleanReportToPDF(
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 40;
 
-  function addTitle() {
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.setTextColor(141, 20, 54);
-    doc.text("Building and Compliance Report", pageWidth / 2, 40, {
-      align: "center",
-    });
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(80, 80, 80);
-    doc.text(
-      `${rows.length} result${rows.length !== 1 ? "s" : ""} found`,
-      pageWidth / 2,
-      58,
-      { align: "center" }
-    );
-  }
-
   function getLastY(fallback: number) {
     return (doc as any).lastAutoTable?.finalY || fallback;
   }
@@ -363,7 +372,19 @@ export function exportCleanReportToPDF(
     return currentY;
   }
 
-  addTitle();
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.setTextColor(141, 20, 54);
+  doc.text("Building and Compliance Report", pageWidth / 2, 40, {
+    align: "center",
+  });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(80, 80, 80);
+  doc.text(`${rows.length} result${rows.length !== 1 ? "s" : ""} found`, pageWidth / 2, 58, {
+    align: "center",
+  });
 
   let y = 90;
 
@@ -403,6 +424,7 @@ export function exportCleanReportToPDF(
         cellPadding: 6,
         lineColor: [220, 220, 220],
         lineWidth: 0.5,
+        overflow: "linebreak",
       },
       columnStyles: {
         0: {
@@ -425,33 +447,17 @@ export function exportCleanReportToPDF(
     });
 
     y = getLastY(y) + 28;
+    y = ensureSpace(y, 100);
 
-    doc.addPage();
-    y = margin;
-    
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.setTextColor(0, 0, 0);
-    doc.text(String(building.building_name || "Unnamed Building"), margin, y);
-    
-    y += 16;
-    
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(80, 80, 80);
-    doc.text(String(building.colleges?.name || "No College"), margin, y);
-    
-    y += 28;
-    
     doc.setFont("helvetica", "bold");
     doc.setFontSize(13);
     doc.setTextColor(0, 86, 63);
     doc.text("Compliance Report", margin, y);
-    
+
     y += 20;
 
     complianceGroups.forEach((group) => {
-      y = ensureSpace(y, 80);
+      y = ensureSpace(y, 100);
 
       doc.setFont("helvetica", "bold");
       doc.setFontSize(11);
@@ -469,6 +475,7 @@ export function exportCleanReportToPDF(
           cellPadding: 6,
           lineColor: [220, 220, 220],
           lineWidth: 0.5,
+          overflow: "linebreak",
         },
         columnStyles: {
           0: {

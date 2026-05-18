@@ -138,6 +138,16 @@ export default function ServiceRequests() {
     return status;
   }
 
+  function getSubmittedByLabel(request: any) {
+    const profile = request.profiles;
+  
+    if (profile?.full_name) return profile.full_name;
+    if (profile?.email) return profile.email;
+    if (request.submitted_by) return "Registered user";
+  
+    return "Not specified";
+  }
+
   async function handleChange(e: any) {
     const { name, value } = e.target;
 
@@ -293,16 +303,18 @@ export default function ServiceRequests() {
   const filteredRequests = useMemo(() => {
     return requests.filter((request) => {
       const matchesStatus = statusFilter ? request.status === statusFilter : true;
-
+  
       const searchText = search.trim().toLowerCase();
-
+      const submittedByText = getSubmittedByLabel(request).toLowerCase();
+  
       const matchesSearch =
         searchText === ""
           ? true
           : request.title?.toLowerCase().includes(searchText) ||
             request.description?.toLowerCase().includes(searchText) ||
-            request.buildings?.building_name?.toLowerCase().includes(searchText);
-
+            request.buildings?.building_name?.toLowerCase().includes(searchText) ||
+            submittedByText.includes(searchText);
+  
       return matchesStatus && matchesSearch;
     });
   }, [requests, statusFilter, search]);
@@ -748,7 +760,7 @@ export default function ServiceRequests() {
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-1 gap-2 text-sm text-black/60 md:grid-cols-3">
+                      <div className="grid grid-cols-1 gap-2 text-sm text-black/60 md:grid-cols-4">
                         <p>
                           <span className="font-semibold text-black">
                             Building:
@@ -768,6 +780,11 @@ export default function ServiceRequests() {
                           {request.rooms?.room_number
                             ? `Room ${request.rooms.room_number}`
                             : "Not specified"}
+                        </p>
+
+                        <p>
+                          <span className="font-semibold text-black">Submitted By:</span>{" "}
+                          {getSubmittedByLabel(request)}
                         </p>
                       </div>
 

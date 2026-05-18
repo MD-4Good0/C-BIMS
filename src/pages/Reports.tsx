@@ -1,5 +1,3 @@
-// src/pages/Reports.tsx
-
 import { useEffect, useMemo, useState } from "react";
 import SidebarLayout from "../layouts/SidebarLayout";
 import { getColleges } from "../colleges";
@@ -20,6 +18,7 @@ export default function Reports() {
   const [colleges, setColleges] = useState<any[]>([]);
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [reportGenerated, setReportGenerated] = useState(false);
 
   const [selectedFields, setSelectedFields] = useState<string[]>(
     getFieldsForReport("building").map((field) => field.key)
@@ -27,14 +26,13 @@ export default function Reports() {
 
   const [showFilters, setShowFilters] = useState(false);
   const [showAttributes, setShowAttributes] = useState(false);
-
   const [showCollegeDropdown, setShowCollegeDropdown] = useState(false);
 
   const [summary, setSummary] = useState({
     totalBuildings: 0,
     withElevator: 0,
     withRamp: 0,
-    withoutStructuralIntegrity: 0,
+    missingStructuralIntegrity: 0,
     withAttachment: 0,
   });
 
@@ -47,7 +45,7 @@ export default function Reports() {
 
   const selectedCollegeName = useMemo(() => {
     if (!filters.collegeId) return "All Colleges";
-  
+
     return (
       colleges.find((college) => String(college.id) === filters.collegeId)?.name ||
       "All Colleges"
@@ -80,8 +78,8 @@ export default function Reports() {
         color: "bg-upyellow",
       },
       {
-        label: "Structural",
-        value: summary.withoutStructuralIntegrity,
+        label: "Missing Structural",
+        value: summary.missingStructuralIntegrity,
         color: "bg-upred",
       },
       {
@@ -102,9 +100,19 @@ export default function Reports() {
         showToast("Failed to load colleges", "error");
       }
     }
-  
+
     loadColleges();
-  }, []);
+  }, [showToast]);
+
+  function resetSummary() {
+    setSummary({
+      totalBuildings: 0,
+      withElevator: 0,
+      withRamp: 0,
+      missingStructuralIntegrity: 0,
+      withAttachment: 0,
+    });
+  }
 
   function handleFilterChange(e: any) {
     const { name, value } = e.target;
@@ -143,6 +151,7 @@ export default function Reports() {
 
     try {
       setLoading(true);
+      setReportGenerated(true);
 
       const data = await getReportBuildings(filters);
       const rows = data || [];
@@ -151,11 +160,19 @@ export default function Reports() {
 
       setSummary({
         totalBuildings: rows.length,
-        withElevator: rows.filter((b) => b.elevator).length,
-        withRamp: rows.filter((b) => b.ramp).length,
-        withoutStructuralIntegrity: rows.filter((b) => !b.structural_integrity).length,
-        withAttachment: rows.filter((b) => b.has_attachment).length,
+        withElevator: rows.filter((building) => building.elevator).length,
+        withRamp: rows.filter((building) => building.ramp).length,
+        missingStructuralIntegrity: rows.filter(
+          (building) => !building.structural_integrity
+        ).length,
+        withAttachment: rows.filter((building) => building.has_attachment).length,
       });
+
+      if (rows.length === 0) {
+        showToast("No buildings matched the selected filters", "info");
+      } else {
+        showToast("Report generated", "success");
+      }
     } catch (err: any) {
       console.error(err);
       showToast(err.message || "Failed to generate report", "error");
@@ -169,7 +186,7 @@ export default function Reports() {
       showToast("No results to export", "warning");
       return;
     }
-  
+
     exportCombinedReportToCSV(
       results,
       selectedBuildingFields,
@@ -177,13 +194,13 @@ export default function Reports() {
       "building-and-compliance-report"
     );
   }
-  
+
   function handleExportXLSX() {
     if (results.length === 0) {
-      showToast("No results to export", "error");
+      showToast("No results to export", "warning");
       return;
     }
-  
+
     exportCombinedReportToXLSX(
       results,
       selectedBuildingFields,
@@ -191,13 +208,13 @@ export default function Reports() {
       "building-and-compliance-report"
     );
   }
-  
+
   function handleExportPDF() {
     if (results.length === 0) {
-      showToast("No results to export", "error");
+      showToast("No results to export", "warning");
       return;
     }
-  
+
     exportCleanReportToPDF(
       results,
       selectedBuildingFields,
@@ -211,17 +228,35 @@ export default function Reports() {
       collegeId: "",
       buildingName: "",
     });
-  
+
     setShowCollegeDropdown(false);
     setResults([]);
-  
-    setSummary({
-      totalBuildings: 0,
-      withElevator: 0,
-      withRamp: 0,
-      withoutStructuralIntegrity: 0,
-      withAttachment: 0,
-    });
+    setReportGenerated(false);
+    resetSummary();
+  }
+
+  function renderPreviewValue(building: any, fieldKey: string) {
+    if (fieldKey === "file_link") {
+      const fileLink =
+        typeof building.file_link === "string" ? building.file_link.trim() : "";
+
+      if (!fileLink) return <span className="text-black/70">N/A</span>;
+
+      return (
+        <a
+          href={fileLink}
+          target="_blank"
+          rel="noreferrer"
+          className="font-medium text-upred underline underline-offset-4"
+        >
+          Open file
+        </a>
+      );
+    }
+
+    const value = getReportValue(building, fieldKey);
+
+    return <span className="text-black/70">{value || "N/A"}</span>;
   }
 
   return (
@@ -290,7 +325,7 @@ export default function Reports() {
                   type="submit"
                   disabled={loading}
                   className={`rounded-xl bg-upred px-6 py-2 text-sm font-medium text-white transition hover:scale-105 ${
-                    loading ? "opacity-50 cursor-not-allowed" : ""
+                    loading ? "cursor-not-allowed opacity-50" : ""
                   }`}
                 >
                   {loading ? "Generating..." : "Generate Report"}
@@ -327,72 +362,75 @@ export default function Reports() {
             {showFilters && (
               <div className="mb-6 flex w-full justify-center">
                 <div className="grid w-full max-w-4xl grid-cols-1 gap-5 md:grid-cols-2">
-                <div className="relative">
-                  <label className="mb-1 block text-sm font-medium">
-                    College
-                  </label>
+                  <div className="relative">
+                    <label className="mb-1 block text-sm font-medium">
+                      College
+                    </label>
 
-                  <button
-                    type="button"
-                    onClick={() => setShowCollegeDropdown((prev) => !prev)}
-                    className="flex w-full items-center justify-between rounded-lg border border-upred/30 bg-white/90 p-2 text-left transition hover:border-upred/50"
-                  >
-                    <span>{selectedCollegeName}</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowCollegeDropdown((prev) => !prev)}
+                      className="flex w-full items-center justify-between rounded-lg border border-upred/30 bg-white/90 p-2 text-left transition hover:border-upred/50"
+                    >
+                      <span>{selectedCollegeName}</span>
 
-                    <ChevronDown
-                      className={`h-5 w-5 text-black/50 transition ${
-                        showCollegeDropdown ? "rotate-180" : ""
-                      }`}
-                    />
-                  </button>
-
-                  {showCollegeDropdown && (
-                    <div className="absolute left-0 right-0 z-40 mt-2 max-h-72 overflow-y-auto rounded-xl border border-upred/20 bg-white shadow-xl">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFilters((prev) => ({
-                            ...prev,
-                            collegeId: "",
-                          }));
-                          setShowCollegeDropdown(false);
-                        }}
-                        className={`flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-upred/5 ${
-                          !filters.collegeId ? "font-semibold text-upred" : "text-black"
+                      <ChevronDown
+                        className={`h-5 w-5 text-black/50 transition ${
+                          showCollegeDropdown ? "rotate-180" : ""
                         }`}
-                      >
-                        All Colleges
+                      />
+                    </button>
 
-                        {!filters.collegeId && <Check className="h-4 w-4" />}
-                      </button>
+                    {showCollegeDropdown && (
+                      <div className="absolute left-0 right-0 z-40 mt-2 max-h-72 overflow-y-auto rounded-xl border border-upred/20 bg-white shadow-xl">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFilters((prev) => ({
+                              ...prev,
+                              collegeId: "",
+                            }));
+                            setShowCollegeDropdown(false);
+                          }}
+                          className={`flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-upred/5 ${
+                            !filters.collegeId
+                              ? "font-semibold text-upred"
+                              : "text-black"
+                          }`}
+                        >
+                          All Colleges
+                          {!filters.collegeId && <Check className="h-4 w-4" />}
+                        </button>
 
-                      {colleges.map((college) => {
-                        const isSelected = String(college.id) === filters.collegeId;
+                        {colleges.map((college) => {
+                          const isSelected =
+                            String(college.id) === filters.collegeId;
 
-                        return (
-                          <button
-                            key={college.id}
-                            type="button"
-                            onClick={() => {
-                              setFilters((prev) => ({
-                                ...prev,
-                                collegeId: String(college.id),
-                              }));
-                              setShowCollegeDropdown(false);
-                            }}
-                            className={`flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-upred/5 ${
-                              isSelected ? "font-semibold text-upred" : "text-black"
-                            }`}
-                          >
-                            {college.name}
-
-                            {isSelected && <Check className="h-4 w-4" />}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                          return (
+                            <button
+                              key={college.id}
+                              type="button"
+                              onClick={() => {
+                                setFilters((prev) => ({
+                                  ...prev,
+                                  collegeId: String(college.id),
+                                }));
+                                setShowCollegeDropdown(false);
+                              }}
+                              className={`flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-upred/5 ${
+                                isSelected
+                                  ? "font-semibold text-upred"
+                                  : "text-black"
+                              }`}
+                            >
+                              {college.name}
+                              {isSelected && <Check className="h-4 w-4" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
 
                   <div>
                     <label className="mb-1 block text-sm font-medium">
@@ -474,14 +512,18 @@ export default function Reports() {
             )}
 
             <div className="mb-8 flex flex-wrap items-center justify-center gap-3">
-              <span className="text-sm font-medium text-black/60">Export as:</span>
+              <span className="text-sm font-medium text-black/60">
+                Export as:
+              </span>
 
               <button
                 type="button"
                 onClick={handleExportCSV}
-                disabled={results.length === 0}
+                disabled={results.length === 0 || loading}
                 className={`rounded-xl border border-upgreen/30 px-5 py-2 text-sm font-medium text-upgreen transition hover:bg-upgreen/10 ${
-                  results.length === 0 ? "opacity-50 cursor-not-allowed" : ""
+                  results.length === 0 || loading
+                    ? "cursor-not-allowed opacity-50"
+                    : ""
                 }`}
               >
                 CSV
@@ -490,9 +532,11 @@ export default function Reports() {
               <button
                 type="button"
                 onClick={handleExportXLSX}
-                disabled={results.length === 0}
+                disabled={results.length === 0 || loading}
                 className={`rounded-xl border border-upgreen/30 px-5 py-2 text-sm font-medium text-upgreen transition hover:bg-upgreen/10 ${
-                  results.length === 0 ? "opacity-50 cursor-not-allowed" : ""
+                  results.length === 0 || loading
+                    ? "cursor-not-allowed opacity-50"
+                    : ""
                 }`}
               >
                 XLSX
@@ -501,9 +545,11 @@ export default function Reports() {
               <button
                 type="button"
                 onClick={handleExportPDF}
-                disabled={results.length === 0}
+                disabled={results.length === 0 || loading}
                 className={`rounded-xl border border-upgreen/30 px-5 py-2 text-sm font-medium text-upgreen transition hover:bg-upgreen/10 ${
-                  results.length === 0 ? "opacity-50 cursor-not-allowed" : ""
+                  results.length === 0 || loading
+                    ? "cursor-not-allowed opacity-50"
+                    : ""
                 }`}
               >
                 PDF
@@ -514,20 +560,22 @@ export default function Reports() {
 
         <div className="report-print-area">
           <div className="mb-4">
-            <h2 className="text-xl font-bold text-upred">
-              Generated Reports
-            </h2>
+            <h2 className="text-xl font-bold text-upred">Generated Reports</h2>
 
             <p className="text-sm text-black/60">
               {results.length} result{results.length !== 1 && "s"} found
             </p>
           </div>
 
-          {results.length === 0 ? (
+          {loading ? (
+            <p className="text-gray-500">Generating report...</p>
+          ) : !reportGenerated ? (
             <p className="text-gray-500">
-              {loading
-                ? "Generating report..."
-                : "No results found. Try adjusting your filters."}
+              Generate a report to display building and compliance results.
+            </p>
+          ) : results.length === 0 ? (
+            <p className="text-gray-500">
+              No results found. Try adjusting your filters.
             </p>
           ) : (
             <div className="space-y-6">
@@ -555,13 +603,11 @@ export default function Reports() {
                       <div className="grid grid-cols-1 gap-2 text-sm">
                         {selectedBuildingFields.map((field) => (
                           <div
-                          key={field.key}
-                          className="rounded-lg border border-black/10 bg-white/80 px-3 py-2"
+                            key={field.key}
+                            className="rounded-lg border border-black/10 bg-white/80 px-3 py-2"
                           >
                             <span className="font-bold">{field.label}:</span>{" "}
-                            <span className="text-black/70">
-                              {getReportValue(building, field.key) || "N/A"}
-                            </span>
+                            {renderPreviewValue(building, field.key)}
                           </div>
                         ))}
                       </div>
@@ -582,13 +628,13 @@ export default function Reports() {
                             <div className="grid grid-cols-1 gap-2 text-sm">
                               {group.fields.map((field) => (
                                 <div
-                                key={field.key}
-                                className="rounded-lg border border-black/10 bg-white/80 px-3 py-2"
+                                  key={field.key}
+                                  className="rounded-lg border border-black/10 bg-white/80 px-3 py-2"
                                 >
-                                  <span className="font-bold">{field.label}:</span>{" "}
-                                  <span className="text-black/70">
-                                    {getReportValue(building, field.key) || "N/A"}
-                                  </span>
+                                  <span className="font-bold">
+                                    {field.label}:
+                                  </span>{" "}
+                                  {renderPreviewValue(building, field.key)}
                                 </div>
                               ))}
                             </div>

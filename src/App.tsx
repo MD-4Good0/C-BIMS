@@ -8,6 +8,7 @@ import AddBuilding from "./pages/AddBuilding";
 import EditBuilding from "./pages/EditBuilding";
 import PopupCallback from "./components/PopupCallback";
 import ProtectedRoute from "./components/ProtectedRoute";
+import RoleRoute from "./components/RoleRoute";
 import AdminColleges from "./pages/AdminColleges";
 import Reports from "./pages/Reports";
 import ServiceRequests from "./pages/ServiceRequests";
@@ -42,54 +43,54 @@ function App() {
         <Route
           path="/add-building"
           element={
-            <ProtectedRoute>
+            <RoleRoute allowedRoles={["admin", "staff"]}>
               <AddBuilding />
-            </ProtectedRoute>
+            </RoleRoute>
           }
         />
 
         <Route
           path="/edit-building/:id"
           element={
-            <ProtectedRoute>
+            <RoleRoute allowedRoles={["admin", "staff"]}>
               <EditBuilding />
-            </ProtectedRoute>
+            </RoleRoute>
           }
         />
 
         <Route
           path="/admin/colleges"
           element={
-            <ProtectedRoute>
+            <RoleRoute allowedRoles={["admin"]}>
               <AdminColleges />
-            </ProtectedRoute>
+            </RoleRoute>
           }
         />
 
         <Route
           path="/admin/users"
           element={
-            <ProtectedRoute>
+            <RoleRoute allowedRoles={["admin"]}>
               <AdminUsers />
-            </ProtectedRoute>
+            </RoleRoute>
           }
         />
 
         <Route
           path="/reports"
           element={
-            <ProtectedRoute>
+            <RoleRoute allowedRoles={["admin", "chief"]}>
               <Reports />
-            </ProtectedRoute>
+            </RoleRoute>
           }
         />
 
         <Route
           path="/service-requests"
           element={
-            <ProtectedRoute>
+            <RoleRoute allowedRoles={["admin", "chief", "staff"]}>
               <ServiceRequests />
-            </ProtectedRoute>
+            </RoleRoute>
           }
         />
       </Routes>

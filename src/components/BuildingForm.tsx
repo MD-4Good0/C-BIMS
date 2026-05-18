@@ -41,10 +41,37 @@ export default function BuildingForm({
   }, [colleges, form.college_id]);
 
   function toggleBoolean(name: string) {
-    setForm((prev: any) => ({
-      ...prev,
-      [name]: !Boolean(prev[name]),
-    }));
+    setForm((prev: any) => {
+      const nextValue = !Boolean(prev[name]);
+      const nextForm = {
+        ...prev,
+        [name]: nextValue,
+      };
+
+      if (name === "renovated_bool" && !nextValue) {
+        nextForm.renovated_area = "";
+      }
+
+      if (name === "ongoing_renovation" && !nextValue) {
+        nextForm.ongoing_renovation_area = "";
+      }
+
+      if (name === "elevator" && !nextValue) {
+        nextForm.elevator_permit_issue = "";
+        nextForm.elevator_permit_expiration = "";
+      }
+
+      if (name === "generator" && !nextValue) {
+        nextForm.generator_issue_date = "";
+        nextForm.generator_expiration_date = "";
+      }
+
+      if (name === "has_attachment" && !nextValue) {
+        nextForm.file_link = "";
+      }
+
+      return nextForm;
+    });
   }
 
   function Field({
@@ -248,7 +275,7 @@ export default function BuildingForm({
               />
             </Field>
 
-            <Field label="Building Footprint" required>
+            <Field label="Building Footprint (sqm)" required>
               <TextInput
                 name="footprint"
                 type="number"
@@ -258,7 +285,7 @@ export default function BuildingForm({
               />
             </Field>
 
-            <Field label="Total Floor Area" required>
+            <Field label="Total Floor Area (sqm)" required>
               <TextInput
                 name="total_floor_area"
                 type="number"
@@ -272,22 +299,24 @@ export default function BuildingForm({
 
         <Section title="Renovation and Cost">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <ToggleField name="renovated_bool" label="Renovated" />
-            <ToggleField name="ongoing_renovation" label="Ongoing Renovation" />
+            <ToggleField name="renovated_bool" label="Renovated Areas" />
+            <ToggleField name="ongoing_renovation" label="On-going Renovations" />
 
-            <Field label="Renovated Area">
+            <Field label="Total Floor Area for Renovated Works">
               <TextInput
                 name="renovated_area"
                 type="number"
                 disabled={!form.renovated_bool}
+                min={0}
               />
             </Field>
 
-            <Field label="Ongoing Renovation Area">
+            <Field label="On-going Renovations Area">
               <TextInput
                 name="ongoing_renovation_area"
                 type="number"
                 disabled={!form.ongoing_renovation}
+                min={0}
               />
             </Field>
 
@@ -300,12 +329,12 @@ export default function BuildingForm({
               />
             </Field>
 
-            <Field label="Cost per SQM">
-              <TextInput name="cost_per_sqm" type="number" />
+            <Field label="Cost per SQM" required>
+              <TextInput name="cost_per_sqm" type="number" required min={1} />
             </Field>
 
             <Field label="Proposed Development Cost">
-              <TextInput name="proposed_dev_cost" type="number" />
+              <TextInput name="proposed_dev_cost" type="number" min={0} />
             </Field>
           </div>
         </Section>
@@ -314,13 +343,13 @@ export default function BuildingForm({
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <ToggleField
               name="structural_integrity"
-              label="Structural Integrity"
+              label="Structural Integrity Assessment"
             />
             <ToggleField name="retrofitting" label="Retrofitting" />
             <ToggleField name="repainting" label="Repainting" />
             <ToggleField name="ramp" label="Ramp" />
             <ToggleField name="elevator" label="Elevator" />
-            <ToggleField name="pwd_restroom" label="PWD Restroom" />
+            <ToggleField name="pwd_restroom" label="PWD Rest Room" />
             <ToggleField
               name="gender_neutral_restroom"
               label="Gender Neutral Restroom"
@@ -330,26 +359,28 @@ export default function BuildingForm({
 
         <Section title="Permits">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <Field label="Building Permit Date" required>
+            <Field label="Building Permit Date Issued" required>
               <TextInput name="building_permit_date" type="date" required />
             </Field>
 
-            <Field label="Occupancy Permit Date" required>
+            <Field label="Occupancy Permit Date Issued" required>
               <TextInput name="occupancy_permit_date" type="date" required />
             </Field>
 
-            <Field label="Elevator Permit Issue Date">
+            <Field label="Elevator Permit Issue Date" required={form.elevator}>
               <TextInput
                 name="elevator_permit_issue"
                 type="date"
+                required={form.elevator}
                 disabled={!form.elevator}
               />
             </Field>
 
-            <Field label="Elevator Permit Expiration Date">
+            <Field label="Elevator Permit Expiration Date" required={form.elevator}>
               <TextInput
                 name="elevator_permit_expiration"
                 type="date"
+                required={form.elevator}
                 disabled={!form.elevator}
               />
             </Field>
@@ -357,43 +388,43 @@ export default function BuildingForm({
         </Section>
 
         <Section title="Utilities and Safety">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <ToggleField name="generator" label="Generator" />
-                <ToggleField name="cistern" label="Cistern" />
-                <ToggleField name="septic_tank" label="Septic Tank" />
-                <ToggleField name="electrical_wiring" label="Electrical Wiring" />
-                <ToggleField name="lvsg" label="LVSG" />
-                <ToggleField name="fdas" label="FDAS" />
-                <ToggleField name="fire_protection" label="Fire Protection" />
-                <ToggleField name="ventilation" label="Ventilation" />
-                <ToggleField name="fiber_lan" label="Fiber / LAN" />
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <ToggleField name="generator" label="Generator" />
+            <ToggleField name="cistern" label="Cistern" />
+            <ToggleField name="septic_tank" label="Septic Tank" />
+            <ToggleField name="electrical_wiring" label="Upgraded Electrical Wiring" />
+            <ToggleField name="lvsg" label="Upgraded Electrical Connection LVSG" />
+            <ToggleField name="fdas" label="FDAS" />
+            <ToggleField name="fire_protection" label="Fire Protection System" />
+            <ToggleField name="ventilation" label="Ventilation" />
+            <ToggleField name="fiber_lan" label="Fiber Optics / Structured Cabling / LAN" />
+          </div>
+
+          {form.generator && (
+            <div className="mt-5 rounded-2xl border border-upgreen/20 bg-upgreen/5 p-4">
+              <h3 className="mb-3 text-sm font-bold text-upgreen">
+                Generator Dates
+              </h3>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <Field label="Generator Issue Date" required>
+                  <TextInput
+                    name="generator_issue_date"
+                    type="date"
+                    required={form.generator}
+                  />
+                </Field>
+
+                <Field label="Generator Expiration Date" required>
+                  <TextInput
+                    name="generator_expiration_date"
+                    type="date"
+                    required={form.generator}
+                  />
+                </Field>
+              </div>
             </div>
-
-            {form.generator && (
-                <div className="mt-5 rounded-2xl border border-upgreen/20 bg-upgreen/5 p-4">
-                <h3 className="mb-3 text-sm font-bold text-upgreen">
-                    Generator Permit Dates
-                </h3>
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <Field label="Generator Issue Date" required>
-                    <TextInput
-                        name="generator_issue_date"
-                        type="date"
-                        required={form.generator}
-                    />
-                    </Field>
-
-                    <Field label="Generator Expiration Date" required>
-                    <TextInput
-                        name="generator_expiration_date"
-                        type="date"
-                        required={form.generator}
-                    />
-                    </Field>
-                </div>
-                </div>
-            )}
+          )}
         </Section>
 
         <Section title="Environmental Compliance">
@@ -414,11 +445,22 @@ export default function BuildingForm({
             <Field label="File Link / Path" required={form.has_attachment}>
               <TextInput
                 name="file_link"
-                placeholder="Paste file link"
+                placeholder="Paste Google Drive link or file storage path"
                 required={form.has_attachment}
                 disabled={!form.has_attachment}
               />
             </Field>
+
+            {form.has_attachment && form.file_link?.trim() && (
+              <a
+                href={form.file_link.trim()}
+                target="_blank"
+                rel="noreferrer"
+                className="text-sm font-medium text-upred underline underline-offset-4"
+              >
+                Open current attachment
+              </a>
+            )}
           </div>
         </Section>
       </div>

@@ -6,8 +6,8 @@ import { useToast } from "../components/ToastProvider";
 import SidebarLayout from "../layouts/SidebarLayout";
 
 import { getBuildings, deleteBuilding } from "../buildings";
-import { getFloorsByBuilding, createFloor, deleteFloor } from "../floors";
-import { getRoomsByFloor, createRoom, deleteRoom } from "../rooms";
+import { getFloorsByBuilding, createFloor, updateFloor, deleteFloor } from "../floors";
+import { getRoomsByFloor, createRoom, updateRoom, deleteRoom } from "../rooms";
 import { getColleges } from "../colleges";
 import { getAllUsers, getPendingUsers } from "../adminUsers";
 import { getServiceRequests } from "../serviceRequests";
@@ -53,6 +53,16 @@ export default function Dashboard() {
 
   const [newFloor, setNewFloor] = useState<Record<number, string>>({});
   const [newRoom, setNewRoom] = useState<Record<number, string>>({});
+  
+  const [editingFloor, setEditingFloor] = useState<{
+    id: number;
+    value: string;
+  } | null>(null);
+  
+  const [editingRoom, setEditingRoom] = useState<{
+    id: number;
+    value: string;
+  } | null>(null);
 
   const [search, setSearch] = useState("");
   const [collegeFilter, setCollegeFilter] = useState("");
@@ -116,6 +126,30 @@ export default function Dashboard() {
     if (isStaff()) return "text-upgreen";
     if (isChief()) return "text-upred";
     return "text-upred";
+  }
+
+  function renderAttachment(building: any) {
+    const link =
+      typeof building.file_link === "string" ? building.file_link.trim() : "";
+  
+    if (!building.has_attachment) {
+      return <span className="text-black/50">No</span>;
+    }
+  
+    if (!link) {
+      return <span className="text-black/50">Yes, no link</span>;
+    }
+  
+    return (
+      <a
+        href={link}
+        target="_blank"
+        rel="noreferrer"
+        className="font-medium text-upred underline underline-offset-4"
+      >
+        Open
+      </a>
+    );
   }
 
   useEffect(() => {
@@ -352,6 +386,77 @@ export default function Dashboard() {
     setSearch("");
     setCollegeFilter("");
     setShowCollegeDropdown(false);
+  }
+
+  async function handleRenameFloor(floorId: number, buildingId: number) {
+    if (!editingFloor || editingFloor.id !== floorId) return;
+  
+    const floorValue = editingFloor.value.trim();
+  
+    if (!floorValue) {
+      showToast("Floor number cannot be empty", "warning");
+      return;
+    }
+  
+    const floorNumber = Number(floorValue);
+  
+    if (Number.isNaN(floorNumber) || floorNumber <= 0) {
+      showToast("Floor number must be a valid positive number", "warning");
+      return;
+    }
+  
+    const existingFloors = floorsMap[buildingId] || [];
+    const alreadyExists = existingFloors.some(
+      (floor) => floor.id !== floorId && Number(floor.floor_number) === floorNumber
+    );
+  
+    if (alreadyExists) {
+      showToast("That floor already exists in this building", "warning");
+      return;
+    }
+  
+    try {
+      await updateFloor(floorId, floorNumber);
+      setEditingFloor(null);
+      await load();
+      showToast("Floor updated", "success");
+    } catch (err: any) {
+      console.error(err);
+      showToast(err.message || "Failed to update floor", "error");
+    }
+  }
+  
+  async function handleRenameRoom(roomId: number, floorId: number) {
+    if (!editingRoom || editingRoom.id !== roomId) return;
+  
+    const roomNumber = editingRoom.value.trim();
+  
+    if (!roomNumber) {
+      showToast("Room number cannot be empty", "warning");
+      return;
+    }
+  
+    const existingRooms = roomsMap[floorId] || [];
+    const alreadyExists = existingRooms.some(
+      (room) =>
+        room.id !== roomId &&
+        String(room.room_number).trim().toLowerCase() === roomNumber.toLowerCase()
+    );
+  
+    if (alreadyExists) {
+      showToast("That room already exists on this floor", "warning");
+      return;
+    }
+  
+    try {
+      await updateRoom(roomId, roomNumber);
+      setEditingRoom(null);
+      await load();
+      showToast("Room updated", "success");
+    } catch (err: any) {
+      console.error(err);
+      showToast(err.message || "Failed to update room", "error");
+    }
   }
 
   const filteredBuildings = useMemo(() => {
@@ -815,7 +920,7 @@ export default function Dashboard() {
                           <td className="p-2">{String(b.cmr_submission)}</td>
                           <td className="p-2">{String(b.smr_submission)}</td>
                           <td className="p-2">{String(b.testing_requirements)}</td>
-                          <td className="p-2">{String(b.has_attachment)}</td>
+                          <td className="p-2">{renderAttachment(b)}</td>
                           <td className="p-2">
                             <div className="flex gap-3">
                               {(isAdmin() || isStaff()) && (
@@ -863,7 +968,8 @@ export default function Dashboard() {
                           {b.colleges?.name || "No College"}
                         </div>
                         <div className="mt-1 text-sm text-black/60">
-                          {(floorsMap[b.id] || []).length}/{b.num_floors} floors recorded
+                          <span className="font-medium text-black">Attachment:</span>{" "}
+                          {renderAttachment(b)}
                         </div>
                       </div>
 
@@ -915,42 +1021,141 @@ export default function Dashboard() {
                                 key={f.id}
                                 className="border-t border-[#8d1b39]/10 hover:bg-[#8d1b39]/5"
                               >
-                                <td className="p-3 font-medium">
-                                  Floor {f.floor_number}
-                                </td>
+                              <td className="p-3 font-medium">
+                                {editingFloor?.id === f.id ? (
+                                  <div className="flex min-w-52 gap-2">
+                                  <input
+                                    value={editingFloor?.value ?? ""}
+                                    onChange={(e) =>
+                                      setEditingFloor({
+                                        id: f.id,
+                                        value: e.target.value,
+                                      })
+                                    }
+                                    className="w-full rounded-lg border border-[#8d1b39]/30 bg-white/80 p-2"
+                                  />
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRenameFloor(f.id, b.id)}
+                                      className="rounded-lg bg-upgreen px-3 py-2 text-xs text-white"
+                                    >
+                                      Save
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingFloor(null)}
+                                      className="rounded-lg border border-upred/30 px-3 py-2 text-xs text-upred"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <span>Floor {f.floor_number}</span>
+
+                                    {isAdmin() && (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setEditingFloor({
+                                            id: f.id,
+                                            value: String(f.floor_number),
+                                          })
+                                        }
+                                        title="Rename floor"
+                                        className="text-upgreen transition hover:scale-110"
+                                      >
+                                        <Pencil className="h-4 w-4" />
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </td>
 
                                 <td className="p-3">
                                   {(roomsMap[f.id] || []).length === 0 ? (
                                     <span className="text-black/50">No rooms</span>
                                   ) : (
                                     <div className="flex flex-wrap gap-2">
-                                      {(roomsMap[f.id] || []).map((r) => (
-                                        <span
-                                          key={r.id}
-                                          className="rounded-full border border-[#1c5843]/30 px-2 py-1 text-xs"
-                                        >
-                                          Room {r.room_number}
-                                          {isAdmin() && (
+                                    {(roomsMap[f.id] || []).map((r) => (
+                                      <span
+                                        key={r.id}
+                                        className="rounded-full border border-[#1c5843]/30 px-2 py-1 text-xs"
+                                      >
+                                        {editingRoom?.id === r.id ? (
+                                          <span className="inline-flex items-center gap-2">
+                                            <input
+                                              value={editingRoom?.value ?? ""}
+                                              onChange={(e) =>
+                                                setEditingRoom({
+                                                  id: r.id,
+                                                  value: e.target.value,
+                                                })
+                                              }
+                                              className="w-28 rounded border border-[#1c5843]/30 bg-white px-2 py-1 text-xs"
+                                            />
+
                                             <button
                                               type="button"
-                                              onClick={() => {
-                                                setDeleteModal({
-                                                  title: "Delete room?",
-                                                  message: `Are you sure you want to delete Room ${r.room_number}?`,
-                                                  onConfirm: async () => {
-                                                    await deleteRoom(r.id);
-                                                    await load();
-                                                  },
-                                                });
-                                              }}
-                                              title="Delete room"
-                                              className="ml-2 text-upred transition hover:scale-110"
+                                              onClick={() => handleRenameRoom(r.id, f.id)}
+                                              className="font-semibold text-upgreen"
                                             >
-                                              ×
+                                              Save
                                             </button>
-                                          )}
-                                        </span>
-                                      ))}
+
+                                            <button
+                                              type="button"
+                                              onClick={() => setEditingRoom(null)}
+                                              className="font-semibold text-upred"
+                                            >
+                                              Cancel
+                                            </button>
+                                          </span>
+                                        ) : (
+                                          <>
+                                            Room {r.room_number}
+
+                                            {isAdmin() && (
+                                              <button
+                                                type="button"
+                                                onClick={() =>
+                                                  setEditingRoom({
+                                                    id: r.id,
+                                                    value: String(r.room_number),
+                                                  })
+                                                }
+                                                title="Rename room"
+                                                className="ml-2 text-upgreen transition hover:scale-110"
+                                              >
+                                                ✎
+                                              </button>
+                                            )}
+
+                                            {isAdmin() && (
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setDeleteModal({
+                                                    title: "Delete room?",
+                                                    message: `Are you sure you want to delete Room ${r.room_number}?`,
+                                                    onConfirm: async () => {
+                                                      await deleteRoom(r.id);
+                                                      await load();
+                                                    },
+                                                  });
+                                                }}
+                                                title="Delete room"
+                                                className="ml-2 text-upred transition hover:scale-110"
+                                              >
+                                                ×
+                                              </button>
+                                            )}
+                                          </>
+                                        )}
+                                      </span>
+                                    ))}
                                     </div>
                                   )}
                                 </td>

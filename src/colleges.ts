@@ -11,20 +11,35 @@ export async function getColleges() {
   return data;
 }
 
+/* COUNT BUILDINGS USING COLLEGE */
+export async function getCollegeBuildingCount(collegeId: number) {
+  const { count, error } = await supabase
+    .from("buildings")
+    .select("id", { count: "exact", head: true })
+    .eq("college_id", collegeId);
+
+  if (error) throw error;
+  return count || 0;
+}
+
 /* CREATE */
 export async function createCollege(name: string) {
+  const cleanName = name.trim();
+
   const { error } = await supabase
     .from("colleges")
-    .insert([{ name }]);
+    .insert([{ name: cleanName }]);
 
   if (error) throw error;
 }
 
 /* UPDATE */
 export async function updateCollege(id: number, name: string) {
+  const cleanName = name.trim();
+
   const { error } = await supabase
     .from("colleges")
-    .update({ name })
+    .update({ name: cleanName })
     .eq("id", id);
 
   if (error) throw error;
