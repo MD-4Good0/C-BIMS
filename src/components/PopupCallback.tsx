@@ -5,51 +5,66 @@ export default function PopupCallback() {
   useEffect(() => {
     let handled = false;
 
-    function finishLogin() {
+    function notifyAndClose() {
       if (handled) return;
 
       handled = true;
 
-      if (window.opener) {
+      if (window.opener && !window.opener.closed) {
         window.opener.postMessage(
           {
             type: "BIMS_AUTH_SUCCESS",
           },
-          window.location.origin
+          "*"
         );
 
         window.close();
-      } else {
-        window.location.href = "/dashboard";
+        return;
+      }
+
+      window.location.replace("/dashboard");
+    }
+
+    async function finishLogin() {
+      try {
+        const hashParams = new URLSearchParams(
+          window.location.hash.replace(/^#/, "")
+        );
+
+        const accessToken = hashParams.get("access_token");
+        const refreshToken = hashParams.get("refresh_token");
+
+        if (accessToken && refreshToken) {
+          const { error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+          if (error) {
+            console.error("Failed to set popup session:", error);
+            window.location.replace("/");
+            return;
+          }
+
+          notifyAndClose();
+          return;
+        }
+
+        const { data } = await supabase.auth.getSession();
+
+        if (data.session) {
+          notifyAndClose();
+          return;
+        }
+
+        window.location.replace("/");
+      } catch (err) {
+        console.error("Popup callback failed:", err);
+        window.location.replace("/");
       }
     }
 
-    async function checkSession() {
-      const { data } = await supabase.auth.getSession();
-
-      if (data.session) {
-        finishLogin();
-      }
-    }
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        finishLogin();
-      }
-    });
-
-    checkSession();
-
-    const fallbackTimer = setTimeout(() => {
-      checkSession();
-    }, 1000);
-
-    return () => {
-      clearTimeout(fallbackTimer);
-      subscription.unsubscribe();
-    };
+    finishLogin();
   }, []);
 
   return (
