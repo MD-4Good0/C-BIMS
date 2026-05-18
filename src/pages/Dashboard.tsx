@@ -175,7 +175,7 @@ export default function Dashboard() {
     label?: string;
   }) {
     return (
-      <span className="inline-flex rounded-full border border-upyellow/40 bg-upyellow/10 px-3 py-1 text-xs font-medium text-black/70">
+      <span className="inline-flex rounded-full border border-upred/40 bg-upred/10 px-3 py-1 text-xs font-medium text-black/70">
         {label}
       </span>
     );
@@ -1344,24 +1344,26 @@ export default function Dashboard() {
                                             className="inline-flex items-center gap-1"
                                           >
                                             <>
-                                              {canRenameFloorRoom() ? (
-                                                <button
-                                                  type="button"
-                                                  onClick={() =>
-                                                    setEditingRoom({
-                                                      id: r.id,
-                                                      floorId: f.id,
-                                                      value: String(r.room_number),
-                                                    })
-                                                  }
-                                                  title="Edit room number"
-                                                  className="rounded-full border border-upgreen/30 px-3 py-1 text-xs font-medium text-upgreen transition hover:bg-upgreen/10"
-                                                >
-                                                  Room {r.room_number}
-                                                </button>
-                                              ) : (
-                                                <>Room {r.room_number}</>
-                                              )}
+                                            {canRenameFloorRoom() ? (
+                                              <button
+                                                type="button"
+                                                onClick={() =>
+                                                  setEditingRoom({
+                                                    id: r.id,
+                                                    floorId: f.id,
+                                                    value: String(r.room_number),
+                                                  })
+                                                }
+                                                title="Edit room number"
+                                                className="rounded-full border border-upgreen/30 px-3 py-1 text-xs font-medium text-upgreen transition hover:bg-upgreen/10"
+                                              >
+                                                Room {r.room_number}
+                                              </button>
+                                            ) : (
+                                              <span className="rounded-full border border-[#1c5843]/30 px-3 py-1 text-xs font-medium text-black/70">
+                                                Room {r.room_number}
+                                              </span>
+                                            )}
 
                                               {canDeleteFloorRoom() && (
                                                 <button
