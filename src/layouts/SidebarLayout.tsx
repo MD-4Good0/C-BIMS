@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { supabase } from "../supabaseClient";
+import { getPendingUsers } from "../adminUsers";
+import { getServiceRequests } from "../serviceRequests";
 import ProfileModal from "../components/ProfileModal";
 
 import BIMS from "../assets/W-BIMS.png";
@@ -23,6 +25,7 @@ type SidebarLinkProps = {
   to: string;
   title: string;
   icon: LucideIcon;
+  badgeCount?: number;
 };
 
 export default function SideBarLayout({
@@ -32,7 +35,6 @@ export default function SideBarLayout({
   children: React.ReactNode;
   background?: string;
 }) {
-
   const location = useLocation();
 
   const [avatarUrl, setAvatarUrl] = useState<string | null>(() => {
@@ -47,9 +49,11 @@ export default function SideBarLayout({
     return sessionStorage.getItem("bims_sidebar_expanded") === "true";
   });
 
+  const [pendingUsersCount, setPendingUsersCount] = useState(0);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showFade, setShowFade] = useState(false);
-
   const [showProfileModal, setShowProfileModal] = useState(false);
 
   useEffect(() => {
@@ -65,6 +69,8 @@ export default function SideBarLayout({
         setAvatarUrl(null);
         setRole(null);
         setSidebarExpanded(false);
+        setPendingUsersCount(0);
+        setPendingRequestsCount(0);
         return;
       }
 
@@ -98,6 +104,62 @@ export default function SideBarLayout({
     loadUserData();
   }, []);
 
+  useEffect(() => {
+    if (!role) {
+      setPendingUsersCount(0);
+      setPendingRequestsCount(0);
+      return;
+    }
+
+    let mounted = true;
+
+    async function loadNotificationCounts() {
+      try {
+        if (role === "admin") {
+          const pendingUsers = await getPendingUsers();
+
+          if (mounted) {
+            setPendingUsersCount(pendingUsers?.length || 0);
+          }
+        } else if (mounted) {
+          setPendingUsersCount(0);
+        }
+
+        if (role === "admin" || role === "chief") {
+          const requests = await getServiceRequests();
+          const pendingRequests =
+            requests?.filter((request) => request.status === "pending")
+              .length || 0;
+
+          if (mounted) {
+            setPendingRequestsCount(pendingRequests);
+          }
+        } else if (mounted) {
+          setPendingRequestsCount(0);
+        }
+      } catch (err) {
+        console.error("Failed to load sidebar notifications:", err);
+
+        if (mounted) {
+          setPendingUsersCount(0);
+          setPendingRequestsCount(0);
+        }
+      }
+    }
+
+    loadNotificationCounts();
+
+    const interval = window.setInterval(loadNotificationCounts, 30000);
+
+    window.addEventListener("focus", loadNotificationCounts);
+
+    return () => {
+      mounted = false;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", loadNotificationCounts);
+    };
+  }, [role]);
+
   function isActive(path: string) {
     return location.pathname === path;
   }
@@ -112,7 +174,31 @@ export default function SideBarLayout({
     }
   }
 
-  function renderSidebarIconLink({ to, title, icon: Icon }: SidebarLinkProps) {
+  function formatBadgeCount(count: number) {
+    if (count > 99) return "99+";
+    return String(count);
+  }
+
+  function renderBadge(count?: number) {
+    if (!count || count <= 0) return null;
+
+    return (
+      <span
+        className={`absolute top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-upyellow px-1.5 text-[11px] font-extrabold leading-none text-upred shadow-md transition-all duration-300 ${
+          sidebarExpanded ? "right-3" : "right-5"
+        }`}
+      >
+        {formatBadgeCount(count)}
+      </span>
+    );
+  }
+
+  function renderSidebarIconLink({
+    to,
+    title,
+    icon: Icon,
+    badgeCount,
+  }: SidebarLinkProps) {
     const active = isActive(to);
 
     return (
@@ -137,6 +223,8 @@ export default function SideBarLayout({
         >
           {title}
         </span>
+
+        {renderBadge(badgeCount)}
       </Link>
     );
   }
@@ -220,21 +308,20 @@ export default function SideBarLayout({
               }}
             />
 
-            {role === "admin" && (
-              <>
-                {renderSidebarIconLink({
-                  to: "/admin/users",
-                  title: "Manage Users",
-                  icon: Users,
-                })}
+            {role === "admin" &&
+              renderSidebarIconLink({
+                to: "/admin/users",
+                title: "Manage Users",
+                icon: Users,
+                badgeCount: pendingUsersCount,
+              })}
 
-                {renderSidebarIconLink({
-                  to: "/admin/colleges",
-                  title: "Manage Colleges",
-                  icon: School,
-                })}
-              </>
-            )}
+            {role === "admin" &&
+              renderSidebarIconLink({
+                to: "/admin/colleges",
+                title: "Manage Colleges",
+                icon: School,
+              })}
 
             {(role === "admin" || role === "staff") &&
               renderSidebarIconLink({
@@ -243,18 +330,22 @@ export default function SideBarLayout({
                 icon: Building2,
               })}
 
-            {(role === "admin" || role === "chief") &&
-              renderSidebarIconLink({
-                to: "/reports",
-                title: "Reports",
-                icon: FileBarChart,
-              })}
-
             {(role === "admin" || role === "staff" || role === "chief") &&
               renderSidebarIconLink({
                 to: "/service-requests",
                 title: "Service Requests",
                 icon: ClipboardList,
+                badgeCount:
+                  role === "admin" || role === "chief"
+                    ? pendingRequestsCount
+                    : 0,
+              })}
+
+            {(role === "admin" || role === "chief") &&
+              renderSidebarIconLink({
+                to: "/reports",
+                title: "Reports",
+                icon: FileBarChart,
               })}
           </div>
 
@@ -275,10 +366,10 @@ export default function SideBarLayout({
             })}
 
             <button
-            type="button"
-            title="Profile"
-            onClick={() => setShowProfileModal(true)}
-            className="relative block h-11 w-full overflow-hidden rounded-xl text-white opacity-75 transition-opacity duration-200 hover:opacity-100"
+              type="button"
+              title="Profile"
+              onClick={() => setShowProfileModal(true)}
+              className="relative block h-11 w-full overflow-hidden rounded-xl text-white opacity-75 transition-opacity duration-200 hover:opacity-100"
             >
               <span className="absolute left-0 top-0 flex h-11 w-20 items-center justify-center">
                 {avatarUrl ? (
