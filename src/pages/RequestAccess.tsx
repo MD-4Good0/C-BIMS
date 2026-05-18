@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "../supabaseClient";
 import { useToast } from "../components/ToastProvider";
+
+import LoginBG from "../assets/LoginBG.png";
+import BIMS from "../assets/W-BIMS.png";
+import PrivacyNotice from "../assets/PrivacyNotice.png";
 
 type AccessStatus =
   | "loading"
@@ -20,6 +25,12 @@ export default function RequestAccess() {
   const [submitting, setSubmitting] = useState(false);
   const [justSubmitted, setJustSubmitted] = useState(false);
   const [status, setStatus] = useState<AccessStatus>("loading");
+  const [fadeOverlay, setFadeOverlay] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setFadeOverlay(false), 600);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     async function loadState() {
@@ -126,152 +137,297 @@ export default function RequestAccess() {
     window.location.href = "/";
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <p>Loading...</p>
-      </div>
-    );
+  function goToLogin() {
+    window.location.href = "/";
+  }
+
+  function goToDashboard() {
+    window.location.href = "/dashboard";
+  }
+
+  function getHeading() {
+    if (status === "pending") return "Request Pending";
+    if (status === "rejected") return "Access Rejected";
+    if (status === "approved") return "Access Approved";
+    if (status === "no_user") return "Not Logged In";
+    if (status === "unknown") return "Access Error";
+    return "Request Access";
+  }
+
+  function getSubheading() {
+    if (status === "pending" && justSubmitted) {
+      return "Your access request has been submitted successfully.";
+    }
+
+    if (status === "pending") {
+      return "Your account is waiting for administrator approval.";
+    }
+
+    if (status === "rejected") {
+      return "Your previous request was rejected. You may submit another request.";
+    }
+
+    if (status === "approved") {
+      return "Your account is already approved.";
+    }
+
+    if (status === "no_user") {
+      return "Please login first before requesting access.";
+    }
+
+    if (status === "unknown") {
+      return "Something went wrong while checking your access.";
+    }
+
+    return "Your account is not yet allowed to enter the system.";
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white p-6">
-      <div className="w-full max-w-md border rounded-xl p-6 shadow-sm">
-        <h1 className="text-2xl font-bold mb-2">Request Access</h1>
-        <p className="text-sm text-gray-600 mb-6">
-          Your account is not yet allowed to enter the system.
-        </p>
+    <div
+      className="relative flex min-h-screen items-center justify-center overflow-hidden bg-black bg-cover bg-center px-6 font-poppins"
+      style={{ backgroundImage: `url(${LoginBG})` }}
+    >
+      <div className="absolute inset-0 bg-black/30" />
 
-        {status === "pending" && justSubmitted && (
-          <div className="space-y-4">
-            <p className="text-green-700 font-medium">
-              Your access request has been submitted successfully.
-            </p>
-            <p className="text-sm text-gray-600">
-              Please wait for an administrator to review your request.
-            </p>
+      <motion.div
+        initial={{ opacity: 0.5, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.9 }}
+        className="relative z-10 flex w-full max-w-4xl flex-col items-center justify-center gap-8 rounded-xl border-5 border-upyellow/50 bg-upred/60 p-8 shadow-xl backdrop-blur-sm md:flex-row md:p-10"
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.7, delay: 0.1 }}
+          className="flex w-full flex-col items-center justify-center md:w-1/2"
+        >
+          <img
+            src={BIMS}
+            alt="BIMS Logo"
+            className="mb-4 w-64 transition hover:scale-105"
+          />
 
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 bg-black text-white rounded cursor-pointer"
-            >
-              Logout
-            </button>
+          <p className="text-center text-sm italic text-white/75">
+            Building Inventory Management System
+          </p>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, x: 16 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.7, delay: 0.2 }}
+          className="w-full md:w-1/2"
+        >
+          <div className="mb-5 text-center md:text-left">
+            <p className="text-xl font-light text-white/85">UP Manila BIMS</p>
+
+            <h1 className="text-4xl font-extrabold tracking-wide text-white">
+              {getHeading()}
+            </h1>
+
+            <p className="mt-2 text-sm leading-6 text-white/75">
+              {loading ? "Checking your account status..." : getSubheading()}
+            </p>
           </div>
-        )}
 
-        {status === "pending" && !justSubmitted && (
-          <div className="space-y-4">
-            <p className="text-yellow-700 font-medium">
-              You already have a pending access request.
-            </p>
-            <p className="text-sm text-gray-600">
-              Please wait for an administrator to approve your request.
-            </p>
-
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 bg-black text-white rounded cursor-pointer"
-            >
-              Logout
-            </button>
-          </div>
-        )}
-
-        {(status === "no_profile" || status === "rejected") && (
-          <div className="space-y-4">
-            <p className="text-red-700 font-medium">
-              {status === "no_profile"
-                ? "We could not find your access record."
-                : "Your access request was rejected."}
-            </p>
-            <p className="text-sm text-gray-600">
-              Submit a request below and wait for administrator approval.
-            </p>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block mb-1 font-medium">Email</label>
-                <input
-                  value={email}
-                  disabled
-                  className="border p-2 rounded w-full bg-gray-100"
-                />
+          <div className="rounded-2xl border border-white/25 bg-white/15 p-5 shadow-lg backdrop-blur-md">
+            {loading || status === "loading" ? (
+              <div className="flex min-h-44 flex-col items-center justify-center gap-3 text-white/80">
+                <div className="h-7 w-7 animate-spin rounded-full border-2 border-white/80 border-t-transparent" />
+                <p className="text-sm">Checking access status...</p>
               </div>
+            ) : (
+              <>
+                {(status === "no_profile" || status === "rejected") && (
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-white/85">
+                        Email
+                      </label>
 
-              <div>
-                <label className="block mb-1 font-medium">Requested Role</label>
-                <select
-                  value={role}
-                  onChange={(e) => setRole(e.target.value as "staff" | "chief")}
-                  className="border p-2 rounded w-full"
-                >
-                  <option value="staff">CPDMO Staff</option>
-                  <option value="chief">CPDMO Chief</option>
-                </select>
-              </div>
+                      <input
+                        value={email}
+                        disabled
+                        className="w-full cursor-not-allowed rounded-xl border border-white/30 bg-white/90 p-3 text-black/60"
+                      />
+                    </div>
 
-              <div className="flex gap-3">
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-4 py-2 bg-black text-white rounded cursor-pointer"
-                >
-                  {submitting ? "Submitting..." : "Submit Request"}
-                </button>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-white/85">
+                        Requested Role
+                      </label>
 
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="px-4 py-2 border rounded cursor-pointer"
-                >
-                  Logout
-                </button>
-              </div>
-            </form>
+                      <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-white/30 bg-white/15">
+                        <button
+                          type="button"
+                          onClick={() => setRole("staff")}
+                          className={`px-4 py-3 text-sm font-semibold transition ${
+                            role === "staff"
+                              ? "bg-upgreen text-white"
+                              : "text-white/80 hover:bg-white/10"
+                          }`}
+                        >
+                          Staff
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setRole("chief")}
+                          className={`px-4 py-3 text-sm font-semibold transition ${
+                            role === "chief"
+                              ? "bg-upyellow text-black"
+                              : "text-white/80 hover:bg-white/10"
+                          }`}
+                        >
+                          Chief
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-3 pt-2 sm:flex-row">
+                      <button
+                        type="submit"
+                        disabled={submitting}
+                        className="flex-1 rounded-full bg-white px-5 py-3 text-sm font-semibold text-upred shadow-md transition hover:scale-[1.02] hover:bg-upgreen hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {submitting ? "Submitting..." : "Submit Request"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleLogout}
+                        disabled={submitting}
+                        className="flex-1 rounded-full border border-white/40 px-5 py-3 text-sm font-semibold text-white transition hover:scale-[1.02] hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Logout
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {status === "pending" && (
+                  <div className="space-y-4 text-center">
+                    <div className="rounded-xl border border-upyellow/40 bg-upyellow/20 p-4 text-white">
+                      <p className="font-semibold">
+                        {justSubmitted
+                          ? "Your request was submitted."
+                          : "Your request is already pending."}
+                      </p>
+
+                      <p className="mt-2 text-sm text-white/75">
+                        Please wait for an administrator to review your account.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="w-full rounded-full bg-white px-5 py-3 text-sm font-semibold text-upred shadow-md transition hover:scale-[1.02] hover:bg-upgreen hover:text-white"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                )}
+
+                {status === "approved" && (
+                  <div className="space-y-4 text-center">
+                    <div className="rounded-xl border border-upgreen/30 bg-upgreen/20 p-4 text-white">
+                      <p className="font-semibold">
+                        Your account has already been approved.
+                      </p>
+
+                      <p className="mt-2 text-sm text-white/75">
+                        Continue to the dashboard to access the system.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={goToDashboard}
+                      className="w-full rounded-full bg-white px-5 py-3 text-sm font-semibold text-upred shadow-md transition hover:scale-[1.02] hover:bg-upgreen hover:text-white"
+                    >
+                      Go to Dashboard
+                    </button>
+                  </div>
+                )}
+
+                {status === "no_user" && (
+                  <div className="space-y-4 text-center">
+                    <div className="rounded-xl border border-upred/30 bg-upred/25 p-4 text-white">
+                      <p className="font-semibold">You are not logged in.</p>
+
+                      <p className="mt-2 text-sm text-white/75">
+                        Return to the login page and sign in with your UP Mail.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={goToLogin}
+                      className="w-full rounded-full bg-white px-5 py-3 text-sm font-semibold text-upred shadow-md transition hover:scale-[1.02] hover:bg-upgreen hover:text-white"
+                    >
+                      Back to Login
+                    </button>
+                  </div>
+                )}
+
+                {status === "unknown" && (
+                  <div className="space-y-4 text-center">
+                    <div className="rounded-xl border border-upred/30 bg-upred/25 p-4 text-white">
+                      <p className="font-semibold">
+                        Something went wrong while checking access.
+                      </p>
+
+                      <p className="mt-2 text-sm text-white/75">
+                        Please logout and try signing in again.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="w-full rounded-full bg-white px-5 py-3 text-sm font-semibold text-upred shadow-md transition hover:scale-[1.02] hover:bg-upgreen hover:text-white"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
           </div>
-        )}
 
-        {status === "approved" && (
-          <div className="space-y-4">
-            <p className="text-green-700 font-medium">
-              Your account has already been approved.
-            </p>
-            <a
-              href="/dashboard"
-              className="inline-block px-4 py-2 bg-black text-white rounded"
-            >
-              Go to Dashboard
-            </a>
-          </div>
-        )}
+          <p className="mt-4 text-center text-xs text-white/65">
+            © 2026 UP Manila Building Inventory Management System
+          </p>
+        </motion.div>
+      </motion.div>
 
-        {status === "no_user" && (
-          <div className="space-y-4">
-            <p className="text-red-700 font-medium">You are not logged in.</p>
-            <a
-              href="/"
-              className="inline-block px-4 py-2 bg-black text-white rounded"
-            >
-              Back to Login
-            </a>
-          </div>
-        )}
+      <motion.button
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.8, delay: 0.2 }}
+        className="absolute bottom-1 right-1 z-10 flex items-center gap-3 rounded-xl px-5 py-3 transition hover:cursor-pointer hover:bg-white/10 hover:text-upbrightred"
+        onClick={() => window.open("https://privacy.up.edu.ph/", "_blank")}
+      >
+        <div className="flex flex-col items-end text-center text-sm text-white/70">
+          <div className="font-semibold text-upbrightred">UP</div>
+          <div>Privacy Notice</div>
+        </div>
 
-        {status === "unknown" && (
-          <div className="space-y-4">
-            <p className="text-red-700 font-medium">
-              Something went wrong while checking access.
-            </p>
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 bg-black text-white rounded cursor-pointer"
-            >
-              Logout
-            </button>
-          </div>
+        <img src={PrivacyNotice} alt="Privacy Notice" className="w-10" />
+      </motion.button>
+
+      <AnimatePresence>
+        {fadeOverlay && (
+          <motion.div
+            className="fixed inset-0 z-50 bg-black"
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1, delay: 0.1 }}
+          />
         )}
-      </div>
+      </AnimatePresence>
     </div>
   );
 }
