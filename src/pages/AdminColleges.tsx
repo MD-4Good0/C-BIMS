@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Pencil, Trash2 } from "lucide-react";
 import SidebarLayout from "../layouts/SidebarLayout";
 import {
   getColleges,
@@ -7,33 +9,48 @@ import {
   deleteCollege,
 } from "../colleges";
 import { getCurrentUserRole } from "../auth";
+import { useToast } from "../components/ToastProvider";
 
 export default function AdminColleges() {
+  const { showToast } = useToast();
+
   const [role, setRole] = useState<string | null>(null);
   const [colleges, setColleges] = useState<any[]>([]);
   const [newCollege, setNewCollege] = useState("");
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
+
+  const [editModal, setEditModal] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
+
+  const [confirmModal, setConfirmModal] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => Promise<void>;
+  } | null>(null);
 
   useEffect(() => {
-    async function initialize() {
-      try {
-        const r = await getCurrentUserRole();
-        setRole(r);
-
-        if (r === "admin") {
-          const data = await getColleges();
-          setColleges(data || []);
-        }
-      } catch (err) {
-        console.error(err);
-        alert("Failed to load colleges");
-      } finally {
-        setLoading(false);
-      }
-    }
-
     initialize();
   }, []);
+
+  async function initialize() {
+    try {
+      const currentRole = await getCurrentUserRole();
+      setRole(currentRole);
+
+      if (currentRole === "admin") {
+        await load();
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to load colleges", "error");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function load() {
     const data = await getColleges();
@@ -44,144 +61,358 @@ export default function AdminColleges() {
     const name = newCollege.trim();
 
     if (!name) {
-      alert("College name cannot be empty");
+      showToast("College name cannot be empty", "warning");
       return;
     }
 
     try {
+      setProcessing(true);
       await createCollege(name);
       setNewCollege("");
       await load();
+      showToast("College added", "success");
     } catch (err: any) {
       console.error(err);
-      alert(err.message || "Failed to add college");
+      showToast(err.message || "Failed to add college", "error");
+    } finally {
+      setProcessing(false);
     }
   }
 
-  async function handleUpdate(id: number, currentName: string) {
-    const name = prompt("New college name:", currentName);
+  function openEditModal(college: any) {
+    setEditModal({
+      id: college.id,
+      name: college.name,
+    });
+  }
 
-    if (!name?.trim()) return;
+  async function handleUpdate() {
+    if (!editModal) return;
+
+    const name = editModal.name.trim();
+
+    if (!name) {
+      showToast("College name cannot be empty", "warning");
+      return;
+    }
 
     try {
-      await updateCollege(id, name.trim());
+      setProcessing(true);
+      await updateCollege(editModal.id, name);
+      setEditModal(null);
       await load();
+      showToast("College updated", "success");
     } catch (err: any) {
       console.error(err);
-      alert(err.message || "Failed to update college");
+      showToast(err.message || "Failed to update college", "error");
+    } finally {
+      setProcessing(false);
     }
   }
 
-  async function handleDelete(id: number) {
-    const confirmDelete = window.confirm("Delete this college?");
-    if (!confirmDelete) return;
+  function requestDelete(college: any) {
+    setConfirmModal({
+      title: "Delete college?",
+      message: `Are you sure you want to delete ${college.name}?`,
+      onConfirm: async () => {
+        await deleteCollege(college.id);
+        await load();
+      },
+    });
+  }
+
+  async function handleConfirmAction() {
+    if (!confirmModal) return;
 
     try {
-      await deleteCollege(id);
-      await load();
+      setProcessing(true);
+      await confirmModal.onConfirm();
+      setConfirmModal(null);
+      showToast("College deleted", "success");
     } catch (err: any) {
       console.error(err);
-      alert(err.message || "Failed to delete college");
+      showToast(err.message || "Failed to delete college", "error");
+    } finally {
+      setProcessing(false);
     }
   }
+
+  const filteredColleges = useMemo(() => {
+    return colleges.filter((college) =>
+      college.name?.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [colleges, search]);
+
+  const statCards = useMemo(() => {
+    return [
+      {
+        label: "Colleges",
+        value: colleges.length,
+        color: "bg-upred",
+      },
+      {
+        label: "Shown",
+        value: filteredColleges.length,
+        color: "bg-upgreen",
+      },
+    ];
+  }, [colleges.length, filteredColleges.length]);
 
   return (
     <SidebarLayout background="white">
       <div className="min-h-screen bg-white p-6">
-        {loading ? (
-          <p>Loading colleges...</p>
-        ) : role !== "admin" ? (
-          <p className="text-[#8d1b39]">Access denied. Admins only.</p>
-        ) : (
-          <>
-            <div className="mb-6 rounded-2xl border border-[#8d1b39]/20 bg-white/75 p-6 shadow-md backdrop-blur-md">
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <p className="text-sm font-medium text-black/60">Admin</p>
-                  <h1 className="text-3xl font-bold text-[#f9b837]">
-                    Manage Colleges
-                  </h1>
-                  <p className="mt-1 text-sm text-black/60">
-                    Add, update, or remove colleges used in the building inventory.
-                  </p>
+        <AnimatePresence>
+          {confirmModal && (
+            <motion.div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <motion.div
+                className="ml-15 flex flex-col items-center gap-3 rounded-2xl border border-white/40 bg-white/90 px-10 py-6 shadow-xl backdrop-blur-md"
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.8, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <p className="text-center text-xl font-semibold text-black/90">
+                  {confirmModal.title}
+                </p>
+
+                <p className="max-w-sm text-center text-sm text-black/60">
+                  {confirmModal.message}
+                </p>
+
+                <div className="mt-2 flex gap-5">
+                  <button
+                    type="button"
+                    onClick={handleConfirmAction}
+                    disabled={processing}
+                    className="rounded-lg bg-upgreen px-5 py-2 text-white/90 transition hover:scale-110 disabled:opacity-50"
+                  >
+                    ✔
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setConfirmModal(null)}
+                    disabled={processing}
+                    className="rounded-lg bg-upred px-5 py-2 text-white/90 transition hover:scale-110 disabled:opacity-50"
+                  >
+                    ✖
+                  </button>
                 </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-                <div className="rounded-2xl border border-[#8d1b39]/20 bg-white/70 px-6 py-4 text-center shadow-sm">
-                  <div className="text-sm text-black/60">Total Colleges</div>
-                  <div className="text-3xl font-bold">{colleges.length}</div>
-                </div>
-              </div>
-            </div>
+        <AnimatePresence>
+          {editModal && (
+            <motion.div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <motion.div
+                className="ml-15 w-full max-w-md rounded-2xl border border-white/40 bg-white/90 p-6 shadow-xl backdrop-blur-md"
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.8, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <h2 className="text-xl font-bold text-upred">
+                  Edit College
+                </h2>
 
-            <div className="mb-6 rounded-2xl border border-[#8d1b39]/20 bg-white/70 p-4 shadow-sm backdrop-blur-md">
-              <h2 className="mb-3 text-lg font-semibold">Add College</h2>
+                <p className="mt-1 text-sm text-black/60">
+                  Update the college name.
+                </p>
 
-              <div className="flex flex-col gap-3 md:flex-row">
                 <input
-                  placeholder="New college name"
-                  value={newCollege}
-                  onChange={(e) => setNewCollege(e.target.value)}
-                  className="w-full rounded-lg border border-[#8d1b39]/30 bg-white/80 p-3"
+                  value={editModal.name}
+                  onChange={(e) =>
+                    setEditModal((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            name: e.target.value,
+                          }
+                        : prev
+                    )
+                  }
+                  className="mt-5 w-full rounded-lg border border-upred/30 bg-white/90 p-3"
                 />
 
-                <button
-                  type="button"
-                  onClick={handleCreate}
-                  className="rounded-lg bg-[#8d1b39] px-5 py-3 text-white transition hover:scale-[1.02]"
+                <div className="mt-5 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setEditModal(null)}
+                    disabled={processing}
+                    className="rounded-xl border border-upred/30 px-5 py-2 text-sm font-medium text-upred transition hover:bg-upred/10 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleUpdate}
+                    disabled={processing}
+                    className="rounded-xl bg-upgreen px-5 py-2 text-sm font-medium text-white transition hover:scale-105 disabled:opacity-50"
+                  >
+                    Save
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div className="mb-4 flex w-full justify-center">
+          <div className="text-center">
+            <h1 className="text-3xl font-extrabold leading-none text-upred">
+              Manage Colleges
+            </h1>
+            <p className="mt-2 text-sm text-black/60">
+              Add, update, or remove colleges used in the building inventory.
+            </p>
+          </div>
+        </div>
+
+        <div className="mb-6 h-px w-full bg-black/10" />
+
+        {loading ? (
+          <p className="text-center text-black/60">Loading colleges...</p>
+        ) : role !== "admin" ? (
+          <p className="text-center font-medium text-upred">
+            Access denied. Admins only.
+          </p>
+        ) : (
+          <>
+            <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {statCards.map((card) => (
+                <div
+                  key={card.label}
+                  className={`flex min-h-24 flex-col justify-center rounded-2xl border border-white/40 px-5 py-4 shadow-md backdrop-blur-sm ${card.color} text-white/90 transition hover:scale-105 hover:text-white hover:shadow-lg`}
                 >
-                  Add
-                </button>
+                  <div className="text-sm font-medium">{card.label}</div>
+                  <div className="text-3xl font-extrabold">{card.value}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mb-6 grid grid-cols-1 gap-5 lg:grid-cols-[1fr_1fr]">
+              <div className="rounded-2xl border border-upred/15 bg-white/80 p-5 shadow-sm backdrop-blur-sm">
+                <h2 className="text-lg font-bold text-upred">Add College</h2>
+
+                <p className="mt-1 text-sm text-black/60">
+                  Create a new college option for building records.
+                </p>
+
+                <div className="mt-4 flex flex-col gap-3 md:flex-row">
+                  <input
+                    placeholder="New college name"
+                    value={newCollege}
+                    onChange={(e) => setNewCollege(e.target.value)}
+                    className="w-full rounded-lg border border-upred/30 bg-white/90 p-3"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={handleCreate}
+                    disabled={processing}
+                    className="rounded-xl bg-upred px-5 py-3 text-sm font-medium text-white transition hover:scale-105 disabled:opacity-50"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-upred/15 bg-white/80 p-5 shadow-sm backdrop-blur-sm">
+                <h2 className="text-lg font-bold text-upred">Search</h2>
+
+                <p className="mt-1 text-sm text-black/60">
+                  Find a college by name.
+                </p>
+
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search colleges"
+                  className="mt-4 w-full rounded-lg border border-upred/30 bg-white/90 p-3"
+                />
               </div>
             </div>
 
-            <div className="overflow-x-auto rounded-2xl border border-[#8d1b39]/20 bg-white/70 shadow-sm backdrop-blur-md">
-              <table className="min-w-full text-sm">
-                <thead className="bg-[#8d1b39] text-white">
-                  <tr>
-                    <th className="p-3 text-left">College Name</th>
-                    <th className="p-3 text-left">Actions</th>
-                  </tr>
-                </thead>
+            <div className="rounded-2xl border border-upred/15 bg-white/80 p-5 shadow-sm backdrop-blur-sm">
+              <div className="mb-4 flex flex-col gap-1">
+                <h2 className="text-xl font-bold text-upred">
+                  College List
+                </h2>
 
-                <tbody>
-                  {colleges.length === 0 ? (
+                <p className="text-sm text-black/60">
+                  {filteredColleges.length} college
+                  {filteredColleges.length !== 1 && "s"} found
+                </p>
+              </div>
+
+              <div className="overflow-x-auto rounded-xl border border-upred/15">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-upred text-white">
                     <tr>
-                      <td colSpan={2} className="p-4 text-black/60">
-                        No colleges found.
-                      </td>
+                      <th className="p-3 text-left">College Name</th>
+                      <th className="p-3 text-right">Actions</th>
                     </tr>
-                  ) : (
-                    colleges.map((college) => (
-                      <tr
-                        key={college.id}
-                        className="border-t border-[#8d1b39]/10 hover:bg-[#8d1b39]/5"
-                      >
-                        <td className="p-3 font-medium">{college.name}</td>
+                  </thead>
 
-                        <td className="flex gap-4 p-3">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleUpdate(college.id, college.name)
-                            }
-                            className="underline underline-offset-4"
-                          >
-                            Edit
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(college.id)}
-                            className="text-[#8d1b39] underline underline-offset-4"
-                          >
-                            Delete
-                          </button>
+                  <tbody>
+                    {filteredColleges.length === 0 ? (
+                      <tr>
+                        <td colSpan={2} className="p-4 text-center text-black/60">
+                          No colleges found.
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : (
+                      filteredColleges.map((college) => (
+                        <tr
+                          key={college.id}
+                          className="border-t border-upred/10 hover:bg-upred/5"
+                        >
+                          <td className="p-3 font-medium text-black">
+                            {college.name}
+                          </td>
+
+                          <td className="p-3">
+                            <div className="flex justify-end gap-3">
+                              <button
+                                type="button"
+                                onClick={() => openEditModal(college)}
+                                title="Edit college"
+                                className="text-upgreen transition hover:scale-110"
+                              >
+                                <Pencil className="h-5 w-5" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => requestDelete(college)}
+                                title="Delete college"
+                                className="text-upred transition hover:scale-110"
+                              >
+                                <Trash2 className="h-5 w-5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </>
         )}

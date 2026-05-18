@@ -3,9 +3,12 @@ import { createBuilding } from "../buildings";
 import { getColleges } from "../colleges";
 import { useNavigate } from "react-router-dom";
 import SidebarLayout from "../layouts/SidebarLayout";
+import BuildingForm from "../components/BuildingForm";
+import { useToast } from "../components/ToastProvider";
 
 export default function AddBuilding() {
   const navigate = useNavigate();
+  const { showToast } = useToast();
 
   const [colleges, setColleges] = useState<any[]>([]);
 
@@ -59,16 +62,21 @@ export default function AddBuilding() {
   };
 
   const [form, setForm] = useState(initialForm);
-
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     async function loadColleges() {
-      const data = await getColleges();
-      setColleges(data || []);
+      try {
+        const data = await getColleges();
+        setColleges(data || []);
+      } catch (err) {
+        console.error(err);
+        showToast("Failed to load colleges", "error");
+      }
     }
+
     loadColleges();
-  }, []);
+  }, [showToast]);
 
   function handleChange(e: any) {
     const { name, value, type, checked } = e.target;
@@ -104,52 +112,55 @@ export default function AddBuilding() {
     if (submitting) return;
 
     if (!form.college_id) {
-      alert("College is required");
+      showToast("College is required", "warning");
       return;
     }
 
     if (!form.building_name.trim()) {
-      alert("Building name is required");
+      showToast("Building name is required", "warning");
       return;
     }
 
     if (Number(form.num_floors) <= 0) {
-      alert("Number of floors must be greater than 0");
+      showToast("Number of floors must be greater than 0", "warning");
       return;
     }
 
     if (Number(form.footprint) <= 0) {
-      alert("Footprint must be greater than 0");
+      showToast("Footprint must be greater than 0", "warning");
       return;
     }
 
     if (Number(form.total_floor_area) <= 0) {
-      alert("Total floor area must be greater than 0");
+      showToast("Total floor area must be greater than 0", "warning");
       return;
     }
 
     if (!form.building_permit_date) {
-      alert("Building permit date is required");
+      showToast("Building permit date is required", "warning");
       return;
     }
 
     if (!form.occupancy_permit_date) {
-      alert("Occupancy permit date is required");
+      showToast("Occupancy permit date is required", "warning");
       return;
     }
 
     if (form.generator && !form.generator_issue_date) {
-      alert("Generator issue date is required when generator is checked");
+      showToast("Generator issue date is required when generator is checked", "warning");
       return;
     }
 
     if (form.generator && !form.generator_expiration_date) {
-      alert("Generator expiration date is required when generator is checked");
+      showToast(
+        "Generator expiration date is required when generator is checked",
+        "warning"
+      );
       return;
     }
 
     if (form.has_attachment && !form.file_link.trim()) {
-      alert("File link is required when attachment is checked");
+      showToast("File link is required when attachment is checked", "warning");
       return;
     }
 
@@ -158,7 +169,6 @@ export default function AddBuilding() {
     const payload = {
       ...form,
       college_id: Number(form.college_id),
-
       renovated_area: form.renovated_bool ? Number(form.renovated_area) || null : null,
       ongoing_renovation: Boolean(form.ongoing_renovation),
       ongoing_renovation_area: form.ongoing_renovation
@@ -188,14 +198,18 @@ export default function AddBuilding() {
       payload.generator_expiration_date = null;
     }
 
+    if (!form.has_attachment) {
+      payload.file_link = null;
+    }
+
     try {
       setSubmitting(true);
       await createBuilding(payload);
-      alert("Building created successfully");
+      showToast("Building created successfully", "success");
       navigate("/dashboard");
     } catch (err: any) {
       console.error("INSERT ERROR:", err);
-      alert(err.message || "Insert failed");
+      showToast(err.message || "Insert failed", "error");
     } finally {
       setSubmitting(false);
     }
@@ -203,554 +217,20 @@ export default function AddBuilding() {
 
   return (
     <SidebarLayout background="white">
-      <div className="bg-white min-h-screen p-6">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <h1 className="text-2xl font-bold">Add Building</h1>
-
-          <p className="text-sm text-gray-500">Fields marked with <span className="text-red-500">*</span> are required.</p>
-
-          <div>
-            <h2 className="text-lg font-semibold mb-2">Basic Information</h2>
-
-            <div className="space-y-3">
-              <div>
-                <label className="block mb-1 font-medium">
-                  College <span className="text-red-500">*</span>
-                </label>
-                <select
-                  name="college_id"
-                  value={form.college_id}
-                  onChange={handleChange}
-                  required
-                  className="border p-2 rounded w-full"
-                >
-                  <option value="">Select College</option>
-                  {colleges.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block mb-1 font-medium">
-                  Building Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  name="building_name"
-                  placeholder="Building Name"
-                  value={form.building_name}
-                  onChange={handleChange}
-                  required
-                  className="border p-2 rounded w-full"
-                />
-              </div>
-
-              <div>
-                <label className="block mb-1 font-medium">
-                  Number of Floors <span className="text-red-500">*</span>
-                </label>
-                <input
-                  name="num_floors"
-                  type="number"
-                  placeholder="Number of Floors"
-                  value={form.num_floors}
-                  onChange={handleChange}
-                  required
-                  min={1}
-                  className="border p-2 rounded w-full"
-                />
-              </div>
-
-              <div>
-                <label className="block mb-1 font-medium">
-                  Building Footprint <span className="text-red-500">*</span>
-                </label>
-                <input
-                  name="footprint"
-                  type="number"
-                  placeholder="Building Footprint"
-                  value={form.footprint}
-                  onChange={handleChange}
-                  required
-                  min={1}
-                  className="border p-2 rounded w-full"
-                />
-              </div>
-
-              <div>
-                <label className="block mb-1 font-medium">
-                  Total Floor Area <span className="text-red-500">*</span>
-                </label>
-                <input
-                  name="total_floor_area"
-                  type="number"
-                  placeholder="Total Floor Area"
-                  value={form.total_floor_area}
-                  onChange={handleChange}
-                  required
-                  min={1}
-                  className="border p-2 rounded w-full"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <h2 className="text-lg font-semibold mb-2">Renovation and Cost</h2>
-
-            <div className="space-y-3">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  name="renovated_bool"
-                  checked={form.renovated_bool}
-                  onChange={handleChange}
-                />
-                Renovated?
-              </label>
-
-              <div>
-                <label className="block mb-1 font-medium">
-                  Renovated Area
-                </label>
-
-                <input
-                  name="renovated_area"
-                  type="number"
-                  placeholder="Renovated Area"
-                  value={form.renovated_area}
-                  onChange={handleChange}
-                  disabled={!form.renovated_bool}
-                  className={`border p-2 rounded w-full ${
-                    !form.renovated_bool ? "bg-gray-100 cursor-not-allowed" : ""
-                  }`}
-                />
-              </div>
-
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  name="ongoing_renovation"
-                  checked={!!form.ongoing_renovation}
-                  onChange={handleChange}
-                />
-                Ongoing Renovation
-              </label>
-
-              <div>
-                <label className="block mb-1 font-medium">
-                  Ongoing Renovation Area
-                </label>
-
-                <input
-                  name="ongoing_renovation_area"
-                  type="number"
-                  placeholder="Ongoing Renovation Area"
-                  value={form.ongoing_renovation_area}
-                  onChange={handleChange}
-                  disabled={!form.ongoing_renovation}
-                  className={`border p-2 rounded w-full ${
-                    !form.ongoing_renovation ? "bg-gray-100 cursor-not-allowed" : ""
-                  }`}
-                />
-              </div>
-
-              <div>
-                <label className="block mb-1 font-medium">
-                  Future Renovation Area
-                </label>
-
-                <input
-                  name="future_renovation"
-                  type="number"
-                  placeholder="Future Renovation Area"
-                  value={calculateFutureRenovation()}
-                  readOnly
-                  className="border p-2 rounded w-full bg-gray-100 cursor-not-allowed"
-                />
-              </div>
-
-              <input
-                name="cost_per_sqm"
-                type="number"
-                placeholder="Cost per SQM"
-                value={form.cost_per_sqm}
-                onChange={handleChange}
-                className="border p-2 rounded w-full"
-              />
-
-              <input
-                name="proposed_dev_cost"
-                type="number"
-                placeholder="Proposed Development Cost"
-                value={form.proposed_dev_cost}
-                onChange={handleChange}
-                className="border p-2 rounded w-full"
-              />
-            </div>
-          </div>
-
-          <div>
-            <h2 className="text-lg font-semibold mb-2">Structural and Accessibility</h2>
-
-            <div className="space-y-3">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  name="structural_integrity"
-                  checked={form.structural_integrity}
-                  onChange={handleChange}
-                />
-                Structural Integrity
-              </label>
-
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  name="retrofitting"
-                  checked={form.retrofitting}
-                  onChange={handleChange}
-                />
-                Retrofitting
-              </label>
-
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  name="repainting"
-                  checked={form.repainting}
-                  onChange={handleChange}
-                />
-                Repainting
-              </label>
-
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  name="ramp"
-                  checked={form.ramp}
-                  onChange={handleChange}
-                />
-                Ramp
-              </label>
-
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  name="elevator"
-                  checked={form.elevator}
-                  onChange={handleChange}
-                />
-                Elevator
-              </label>
-
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  name="pwd_restroom"
-                  checked={form.pwd_restroom}
-                  onChange={handleChange}
-                />
-                PWD Restroom
-              </label>
-
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  name="gender_neutral_restroom"
-                  checked={form.gender_neutral_restroom}
-                  onChange={handleChange}
-                />
-                Gender Neutral Restroom
-              </label>
-            </div>
-          </div>
-
-          <div>
-            <h2 className="text-lg font-semibold mb-2">Permits</h2>
-
-            <div className="space-y-3">
-              <div>
-                <label className="block mb-1 font-medium">
-                  Building Permit Date <span className="text-red-500">*</span>
-                </label>
-                <input
-                  name="building_permit_date"
-                  type="date"
-                  value={form.building_permit_date}
-                  onChange={handleChange}
-                  required
-                  className="border p-2 rounded w-full"
-                />
-              </div>
-
-              <div>
-                <label className="block mb-1 font-medium">
-                  Occupancy Permit Date <span className="text-red-500">*</span>
-                </label>
-                <input
-                  name="occupancy_permit_date"
-                  type="date"
-                  value={form.occupancy_permit_date}
-                  onChange={handleChange}
-                  required
-                  className="border p-2 rounded w-full"
-                />
-              </div>
-
-              <div>
-                <label className="block mb-1 font-medium">
-                  Elevator Permit Issue Date
-                </label>
-
-                <input
-                  name="elevator_permit_issue"
-                  type="date"
-                  value={form.elevator_permit_issue}
-                  onChange={handleChange}
-                  disabled={!form.elevator}
-                  className={`border p-2 rounded w-full ${
-                    !form.elevator ? "bg-gray-100 cursor-not-allowed" : ""
-                  }`}
-                />
-              </div>
-
-              <div>
-                <label className="block mb-1 font-medium">
-                  Elevator Permit Expiration Date
-                </label>
-
-                <input
-                  name="elevator_permit_expiration"
-                  type="date"
-                  value={form.elevator_permit_expiration}
-                  onChange={handleChange}
-                  disabled={!form.elevator}
-                  className={`border p-2 rounded w-full ${
-                    !form.elevator ? "bg-gray-100 cursor-not-allowed" : ""
-                  }`}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <h2 className="text-lg font-semibold mb-2">Utilities and Safety</h2>
-
-            <div className="space-y-3">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  name="generator"
-                  checked={form.generator}
-                  onChange={handleChange}
-                />
-                Generator
-              </label>
-
-              <div>
-                <label className="block mb-1 font-medium">
-                  Generator Issue Date
-                  {form.generator && <span className="text-red-500"> *</span>}
-                </label>
-                <input
-                  name="generator_issue_date"
-                  type="date"
-                  value={form.generator_issue_date}
-                  onChange={handleChange}
-                  required={form.generator}
-                  disabled={!form.generator}
-                  className={`border p-2 rounded w-full ${
-                    !form.generator ? "bg-gray-100 cursor-not-allowed" : ""
-                  }`}
-                />
-              </div>
-
-              <div>
-                <label className="block mb-1 font-medium">
-                  Generator Expiration Date
-                  {form.generator && <span className="text-red-500"> *</span>}
-                </label>
-                <input
-                  name="generator_expiration_date"
-                  type="date"
-                  value={form.generator_expiration_date}
-                  onChange={handleChange}
-                  required={form.generator}
-                  disabled={!form.generator}
-                  className={`border p-2 rounded w-full ${
-                    !form.generator ? "bg-gray-100 cursor-not-allowed" : ""
-                  }`}
-                />
-              </div>
-
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  name="cistern"
-                  checked={form.cistern}
-                  onChange={handleChange}
-                />
-                Cistern
-              </label>
-
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  name="septic_tank"
-                  checked={form.septic_tank}
-                  onChange={handleChange}
-                />
-                Septic Tank
-              </label>
-
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  name="electrical_wiring"
-                  checked={form.electrical_wiring}
-                  onChange={handleChange}
-                />
-                Electrical Wiring
-              </label>
-
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  name="lvsg"
-                  checked={form.lvsg}
-                  onChange={handleChange}
-                />
-                LVSG
-              </label>
-
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  name="fdas"
-                  checked={form.fdas}
-                  onChange={handleChange}
-                />
-                FDAS
-              </label>
-
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  name="fire_protection"
-                  checked={form.fire_protection}
-                  onChange={handleChange}
-                />
-                Fire Protection
-              </label>
-
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  name="ventilation"
-                  checked={form.ventilation}
-                  onChange={handleChange}
-                />
-                Ventilation
-              </label>
-
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  name="fiber_lan"
-                  checked={form.fiber_lan}
-                  onChange={handleChange}
-                />
-                Fiber / LAN
-              </label>
-            </div>
-          </div>
-
-          <div>
-            <h2 className="text-lg font-semibold mb-2">Environmental Compliance</h2>
-
-            <div className="space-y-3">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  name="cmr_submission"
-                  checked={form.cmr_submission}
-                  onChange={handleChange}
-                />
-                CMR Submission
-              </label>
-
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  name="smr_submission"
-                  checked={form.smr_submission}
-                  onChange={handleChange}
-                />
-                SMR Submission
-              </label>
-
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  name="testing_requirements"
-                  checked={form.testing_requirements}
-                  onChange={handleChange}
-                />
-                Testing Requirements
-              </label>
-            </div>
-          </div>
-
-          <div>
-            <h2 className="text-lg font-semibold mb-2">Attachments</h2>
-
-            <div className="space-y-3">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  name="has_attachment"
-                  checked={form.has_attachment}
-                  onChange={handleChange}
-                />
-                Has Attachment
-              </label>
-
-              <div>
-                <label className="block mb-1 font-medium">
-                  File Link / Path{" "}
-                  {form.has_attachment && (
-                    <span className="text-red-500">*</span>
-                  )}
-                </label>
-
-                <input
-                  name="file_link"
-                  placeholder="Paste file link (Google Drive, URL, etc.)"
-                  value={form.file_link}
-                  onChange={handleChange}
-                  required={form.has_attachment}
-                  disabled={!form.has_attachment}
-                  className={`border p-2 rounded w-full ${
-                    !form.has_attachment ? "bg-gray-100 cursor-not-allowed" : ""
-                  }`}
-                />
-              </div>
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className={`px-4 py-2 bg-black text-white rounded ${
-              submitting ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-            }`}
-          >
-            {submitting ? "Saving..." : "Save Building"}
-          </button>
-        </form>
+      <div className="min-h-screen bg-white p-6">
+        <BuildingForm
+          title="Add Building"
+          description="Create a new building record and define its facility, compliance, and attachment details."
+          submitLabel="Save Building"
+          submitting={submitting}
+          form={form}
+          setForm={setForm}
+          colleges={colleges}
+          onSubmit={handleSubmit}
+          onCancel={() => navigate("/dashboard")}
+          handleChange={handleChange}
+          calculateFutureRenovation={calculateFutureRenovation}
+        />
       </div>
     </SidebarLayout>
   );

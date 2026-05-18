@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "../supabaseClient";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useToast } from "../components/ToastProvider";
 
 import LoginBG from "../assets/LoginBG.png";
 import BIMS from "../assets/W-BIMS.png";
@@ -10,6 +11,8 @@ import PrivacyNotice from "../assets/PrivacyNotice.png";
 
 export default function Login() {
   const navigate = useNavigate();
+
+  const { showToast } = useToast();
 
   useEffect(() => {
     async function checkSession() {
@@ -63,7 +66,7 @@ export default function Login() {
 
     if (!popup) {
       setLoggingIn(false);
-      alert("Popup was blocked. Please allow popups and try again.");
+      showToast("Popup was blocked. Please allow popups and try again.", "warning");
       return;
     }
 

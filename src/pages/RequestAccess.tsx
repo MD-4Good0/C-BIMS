@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
+import { useToast } from "../components/ToastProvider";
 
 type AccessStatus =
   | "loading"
@@ -11,6 +12,8 @@ type AccessStatus =
   | "unknown";
 
 export default function RequestAccess() {
+  const { showToast } = useToast();
+
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"staff" | "chief">("staff");
   const [loading, setLoading] = useState(true);
@@ -72,6 +75,7 @@ export default function RequestAccess() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
     if (submitting) return;
 
     try {
@@ -82,7 +86,7 @@ export default function RequestAccess() {
       } = await supabase.auth.getUser();
 
       if (!user) {
-        alert("You must be logged in.");
+        showToast("You must be logged in.", "warning");
         return;
       }
 
@@ -102,15 +106,16 @@ export default function RequestAccess() {
 
       if (error) {
         console.error(error);
-        alert(error.message || "Failed to submit request");
+        showToast(error.message || "Failed to submit request", "error");
         return;
       }
 
       setStatus("pending");
       setJustSubmitted(true);
+      showToast("Access request submitted", "success");
     } catch (err: any) {
       console.error(err);
-      alert(err.message || "Failed to submit request");
+      showToast(err.message || "Failed to submit request", "error");
     } finally {
       setSubmitting(false);
     }

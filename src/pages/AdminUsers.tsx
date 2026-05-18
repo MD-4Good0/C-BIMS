@@ -1,4 +1,8 @@
-import { useEffect, useState } from "react";
+// src/pages/AdminUsers.tsx
+
+import { useEffect, useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Check, X } from "lucide-react";
 import SidebarLayout from "../layouts/SidebarLayout";
 import { supabase } from "../supabaseClient";
 import {
@@ -7,17 +11,33 @@ import {
   approveUser,
   rejectUser,
 } from "../adminUsers";
+import { useToast } from "../components/ToastProvider";
+
+type UserRole = "staff" | "chief";
+type UserView = "pending" | "approved" | "rejected";
 
 export default function AdminUsers() {
+  const { showToast } = useToast();
+
   const [loading, setLoading] = useState(true);
   const [accessChecked, setAccessChecked] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [allUsers, setAllUsers] = useState<any[]>([]);
-  const [roleSelections, setRoleSelections] = useState<
-    Record<string, "staff" | "chief">
-  >({});
+  const [activeView, setActiveView] = useState<UserView>("pending");
+
+  const [roleSelections, setRoleSelections] = useState<Record<string, UserRole>>(
+    {}
+  );
+
+  const [confirmModal, setConfirmModal] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => Promise<void>;
+  } | null>(null);
+
+  const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
     initialize();
@@ -47,7 +67,7 @@ export default function AdminUsers() {
 
       if (profileError) {
         console.error(profileError);
-        alert("Failed to check admin access");
+        showToast("Failed to check admin access", "error");
         setIsAdmin(false);
         setAccessChecked(true);
         return;
@@ -67,7 +87,7 @@ export default function AdminUsers() {
       await loadUsers();
     } catch (err) {
       console.error(err);
-      alert("Failed to load users");
+      showToast("Failed to load users", "error");
     } finally {
       setLoading(false);
     }
@@ -96,173 +116,361 @@ export default function AdminUsers() {
       });
     } catch (err) {
       console.error(err);
-      alert("Failed to load users");
+      showToast("Failed to load users", "error");
     }
   }
 
-  async function handleApprove(id: string) {
-    if (id === currentUserId) {
-      alert("You cannot change your own account from this page.");
+  function getRoleLabel(role: string | null | undefined) {
+    if (role === "staff") return "Staff";
+    if (role === "chief") return "Chief";
+    if (role === "admin") return "Admin";
+    return "None";
+  }
+
+  function getStatusClass(status: string) {
+    if (status === "approved") {
+      return "bg-upgreen/10 text-upgreen border-upgreen/20";
+    }
+
+    if (status === "rejected") {
+      return "bg-upred/10 text-upred border-upred/20";
+    }
+
+    return "bg-upyellow/20 text-black border-upyellow/30";
+  }
+
+  function handleRoleSelection(id: string, role: UserRole) {
+    setRoleSelections((prev) => ({
+      ...prev,
+      [id]: role,
+    }));
+  }
+
+  function requestApprove(user: any) {
+    if (user.id === currentUserId) {
+      showToast("You cannot change your own account from this page.", "warning");
       return;
     }
 
-    try {
-      const selectedRole = roleSelections[id] || "staff";
-      await approveUser(id, selectedRole);
-      await loadUsers();
-    } catch (err: any) {
-      console.error(err);
-      alert(err.message || "Failed to approve user");
-    }
+    const selectedRole = roleSelections[user.id] || "staff";
+
+    setConfirmModal({
+      title: user.status === "rejected" ? "Approve rejected user?" : "Approve user?",
+      message: `Approve ${user.email || "this user"} as ${getRoleLabel(
+        selectedRole
+      )}?`,
+      onConfirm: async () => {
+        await approveUser(user.id, selectedRole);
+        await loadUsers();
+      },
+    });
   }
 
-  async function handleReject(id: string) {
-    if (id === currentUserId) {
-      alert("You cannot reject your own account.");
+  function requestReject(user: any) {
+    if (user.id === currentUserId) {
+      showToast("You cannot reject your own account.", "warning");
       return;
     }
 
+    setConfirmModal({
+      title: "Reject user?",
+      message: `Are you sure you want to reject ${user.email || "this user"}?`,
+      onConfirm: async () => {
+        await rejectUser(user.id);
+        await loadUsers();
+      },
+    });
+  }
+
+  async function handleConfirmAction() {
+    if (!confirmModal) return;
+
     try {
-      await rejectUser(id);
-      await loadUsers();
+      setProcessing(true);
+      await confirmModal.onConfirm();
+      setConfirmModal(null);
+      showToast("User updated", "success");
     } catch (err: any) {
       console.error(err);
-      alert(err.message || "Failed to reject user");
+      showToast(err.message || "Action failed", "error");
+    } finally {
+      setProcessing(false);
     }
   }
 
-  const pending = allUsers.filter((user) => user.status === "pending");
-  const approved = allUsers.filter((user) => user.status === "approved");
-  const rejected = allUsers.filter((user) => user.status === "rejected");
+  const pending = useMemo(
+    () => allUsers.filter((user) => user.status === "pending"),
+    [allUsers]
+  );
+
+  const approved = useMemo(
+    () => allUsers.filter((user) => user.status === "approved"),
+    [allUsers]
+  );
+
+  const rejected = useMemo(
+    () => allUsers.filter((user) => user.status === "rejected"),
+    [allUsers]
+  );
+
+  const visibleUsers = useMemo(() => {
+    if (activeView === "pending") return pending;
+    if (activeView === "approved") return approved;
+    return rejected;
+  }, [activeView, pending, approved, rejected]);
+
+  const statCards = useMemo(() => {
+    return [
+      {
+        label: "Users",
+        value: allUsers.length,
+        color: "bg-upred",
+      },
+      {
+        label: "Pending",
+        value: pending.length,
+        color: "bg-upyellow",
+      },
+      {
+        label: "Approved",
+        value: approved.length,
+        color: "bg-upgreen",
+      },
+      {
+        label: "Rejected",
+        value: rejected.length,
+        color: "bg-upred",
+      },
+    ];
+  }, [allUsers.length, pending.length, approved.length, rejected.length]);
 
   return (
     <SidebarLayout background="white">
-      <div className="bg-white min-h-screen p-6">
-        <h1 className="text-2xl font-bold mb-2">Manage Users</h1>
-        <p className="text-sm text-gray-500 mb-6">
-          Review pending access requests and assign approved roles.
-        </p>
+      <div className="min-h-screen bg-white p-6">
+        <AnimatePresence>
+          {confirmModal && (
+            <motion.div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <motion.div
+                className="ml-15 flex flex-col items-center gap-3 rounded-2xl border border-white/40 bg-white/90 px-10 py-6 shadow-xl backdrop-blur-md"
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.8, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <p className="text-center text-xl font-semibold text-black/90">
+                  {confirmModal.title}
+                </p>
+
+                <p className="max-w-sm text-center text-sm text-black/60">
+                  {confirmModal.message}
+                </p>
+
+                <div className="mt-2 flex gap-5">
+                  <button
+                    type="button"
+                    onClick={handleConfirmAction}
+                    disabled={processing}
+                    className="rounded-lg bg-upgreen px-5 py-2 text-white/90 transition hover:scale-110 disabled:opacity-50"
+                  >
+                    ✔
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setConfirmModal(null)}
+                    disabled={processing}
+                    className="rounded-lg bg-upred px-5 py-2 text-white/90 transition hover:scale-110 disabled:opacity-50"
+                  >
+                    ✖
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div className="mb-4 flex w-full justify-center">
+          <div className="text-center">
+            <h1 className="text-3xl font-extrabold leading-none text-upred">
+              Manage Users
+            </h1>
+            <p className="mt-2 text-sm text-black/60">
+              Review access requests and assign user roles.
+            </p>
+          </div>
+        </div>
+
+        <div className="mb-6 h-px w-full bg-black/10" />
 
         {!accessChecked || loading ? (
-          <p>Loading users...</p>
+          <p className="text-center text-black/60">Loading users...</p>
         ) : !isAdmin ? (
-          <p className="text-red-600">Access denied. Admins only.</p>
+          <p className="text-center font-medium text-upred">
+            Access denied. Admins only.
+          </p>
         ) : (
           <>
-            <div className="mb-10">
-              <h2 className="text-xl font-semibold mb-3">Pending Requests</h2>
-
-              {pending.length === 0 ? (
-                <p className="text-gray-500">No pending users.</p>
-              ) : (
-                <div className="space-y-4">
-                  {pending.map((user) => (
-                    <div
-                      key={user.id}
-                      className="border rounded-lg p-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
-                    >
-                      <div>
-                        <div className="font-medium">{user.email || "No email"}</div>
-                        <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded">
-                          Pending
-                        </span>
-                      </div>
-
-                      <div className="flex flex-col gap-2 md:flex-row md:items-center">
-                        <select
-                          value={roleSelections[user.id] || "staff"}
-                          onChange={(e) =>
-                            setRoleSelections((prev) => ({
-                              ...prev,
-                              [user.id]: e.target.value as "staff" | "chief",
-                            }))
-                          }
-                          className="border p-2 rounded"
-                        >
-                          <option value="staff">CPDMO Staff</option>
-                          <option value="chief">CPDMO Chief</option>
-                        </select>
-
-                        <button
-                          onClick={() => handleApprove(user.id)}
-                          className="px-3 py-2 bg-green-700 text-white rounded cursor-pointer"
-                        >
-                          Approve
-                        </button>
-
-                        <button
-                          onClick={() => handleReject(user.id)}
-                          className="px-3 py-2 bg-red-700 text-white rounded cursor-pointer"
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+            <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
+              {statCards.map((card) => (
+                <div
+                  key={card.label}
+                  className={`flex min-h-24 flex-col justify-center rounded-2xl border border-white/40 px-5 py-4 shadow-md backdrop-blur-sm ${card.color} text-white/90 transition hover:scale-105 hover:text-white hover:shadow-lg`}
+                >
+                  <div className="text-sm font-medium">{card.label}</div>
+                  <div className="text-3xl font-extrabold">{card.value}</div>
                 </div>
-              )}
+              ))}
             </div>
 
-            <div className="mb-10">
-              <h2 className="text-xl font-semibold mb-3">Approved Users</h2>
-              {approved.length === 0 ? (
-                <p className="text-gray-500">No approved users.</p>
-              ) : (
-                <div className="space-y-3">
-                  {approved.map((user) => (
-                    <div key={user.id} className="border rounded-lg p-4">
-                      <div className="font-medium">{user.email || "No email"}</div>
-                      <div className="text-sm text-gray-600">
-                        Role: {user.role || "none"}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        Status: {user.status}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+            <div className="mb-6 flex justify-center">
+              <div className="inline-flex overflow-hidden rounded-xl border border-upred/30 bg-white/90">
+                <button
+                  type="button"
+                  onClick={() => setActiveView("pending")}
+                  className={`px-5 py-2 text-sm font-medium transition ${
+                    activeView === "pending"
+                      ? "bg-upred text-white"
+                      : "text-upred hover:bg-upred/10"
+                  }`}
+                >
+                  Pending
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveView("approved")}
+                  className={`px-5 py-2 text-sm font-medium transition ${
+                    activeView === "approved"
+                      ? "bg-upred text-white"
+                      : "text-upred hover:bg-upred/10"
+                  }`}
+                >
+                  Approved
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveView("rejected")}
+                  className={`px-5 py-2 text-sm font-medium transition ${
+                    activeView === "rejected"
+                      ? "bg-upred text-white"
+                      : "text-upred hover:bg-upred/10"
+                  }`}
+                >
+                  Rejected
+                </button>
+              </div>
             </div>
 
-            <div>
-              <h2 className="text-xl font-semibold mb-3">Rejected Users</h2>
-              {rejected.length === 0 ? (
-                <p className="text-gray-500">No rejected users.</p>
+            <div className="rounded-2xl border border-upred/15 bg-white/80 p-5 shadow-sm backdrop-blur-sm">
+              <div className="mb-4 flex flex-col gap-1">
+                <h2 className="text-xl font-bold text-upred">
+                  {activeView === "pending" && "Pending Requests"}
+                  {activeView === "approved" && "Approved Users"}
+                  {activeView === "rejected" && "Rejected Users"}
+                </h2>
+
+                <p className="text-sm text-black/60">
+                  {visibleUsers.length} user
+                  {visibleUsers.length !== 1 && "s"} found
+                </p>
+              </div>
+
+              {visibleUsers.length === 0 ? (
+                <p className="rounded-xl border border-black/10 bg-white/80 px-4 py-6 text-center text-black/50">
+                  No users found.
+                </p>
               ) : (
                 <div className="space-y-3">
-                  {rejected.map((user) => (
+                  {visibleUsers.map((user) => (
                     <div
                       key={user.id}
-                      className="border rounded-lg p-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
+                      className="rounded-xl border border-black/10 bg-white/90 p-4 shadow-sm transition hover:shadow-md"
                     >
-                      <div>
-                        <div className="font-medium">{user.email || "No email"}</div>
-                        <div className="text-sm text-gray-600">
-                          Previous role: {user.role || "none"}
+                      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                          <div className="font-bold text-black">
+                            {user.email || "No email"}
+                          </div>
+
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <span
+                              className={`rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClass(
+                                user.status
+                              )}`}
+                            >
+                              {String(user.status || "unknown").toUpperCase()}
+                            </span>
+
+                            <span className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold text-black/60">
+                              {getRoleLabel(user.role)}
+                            </span>
+                          </div>
                         </div>
-                      </div>
 
-                      <div className="flex flex-col gap-2 md:flex-row md:items-center">
-                        <select
-                          value={roleSelections[user.id] || "staff"}
-                          onChange={(e) =>
-                            setRoleSelections((prev) => ({
-                              ...prev,
-                              [user.id]: e.target.value as "staff" | "chief",
-                            }))
-                          }
-                          className="border p-2 rounded"
-                        >
-                          <option value="staff">CPDMO Staff</option>
-                          <option value="chief">CPDMO Chief</option>
-                        </select>
+                        {activeView !== "approved" ? (
+                          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+                            <div className="inline-flex overflow-hidden rounded-xl border border-upred/30 bg-white">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleRoleSelection(user.id, "staff")
+                                }
+                                className={`px-4 py-2 text-sm font-medium transition ${
+                                  (roleSelections[user.id] || "staff") === "staff"
+                                    ? "bg-upred text-white"
+                                    : "text-upred hover:bg-upred/10"
+                                }`}
+                              >
+                                Staff
+                              </button>
 
-                        <button
-                          onClick={() => handleApprove(user.id)}
-                          className="px-3 py-2 bg-green-700 text-white rounded cursor-pointer"
-                        >
-                          Approve
-                        </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleRoleSelection(user.id, "chief")
+                                }
+                                className={`px-4 py-2 text-sm font-medium transition ${
+                                  roleSelections[user.id] === "chief"
+                                    ? "bg-upred text-white"
+                                    : "text-upred hover:bg-upred/10"
+                                }`}
+                              >
+                                Chief
+                              </button>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => requestApprove(user)}
+                              className="flex items-center justify-center gap-2 rounded-xl bg-upgreen px-4 py-2 text-sm font-medium text-white transition hover:scale-105"
+                            >
+                              <Check className="h-4 w-4" />
+                              Approve
+                            </button>
+
+                            {activeView === "pending" && (
+                              <button
+                                type="button"
+                                onClick={() => requestReject(user)}
+                                className="flex items-center justify-center gap-2 rounded-xl bg-upred px-4 py-2 text-sm font-medium text-white transition hover:scale-105"
+                              >
+                                <X className="h-4 w-4" />
+                                Reject
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-black/50">
+                            Approved account
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}

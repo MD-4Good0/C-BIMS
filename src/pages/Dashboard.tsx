@@ -1,7 +1,8 @@
 import { useLocation, Link } from "react-router-dom";
-import { Pencil, Trash2 } from "lucide-react";
+import { Check, ChevronDown, Pencil, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useMemo } from "react";
+import { useToast } from "../components/ToastProvider";
 import SidebarLayout from "../layouts/SidebarLayout";
 
 import { getBuildings, deleteBuilding } from "../buildings";
@@ -16,6 +17,8 @@ export default function Dashboard() {
   const location = useLocation();
   const fromLogin = location.state?.fromLogin;
 
+  const { showToast } = useToast();
+
   const [showFade, setShowFade] = useState(fromLogin);
   const [loading, setLoading] = useState(true);
 
@@ -23,6 +26,8 @@ export default function Dashboard() {
   const [floorsMap, setFloorsMap] = useState<Record<number, any[]>>({});
   const [roomsMap, setRoomsMap] = useState<Record<number, any[]>>({});
   const [colleges, setColleges] = useState<any[]>([]);
+
+  const [showCollegeDropdown, setShowCollegeDropdown] = useState(false);
 
   const [role, setRole] = useState<string | null>(() => {
     return sessionStorage.getItem("bims_role");
@@ -64,6 +69,15 @@ export default function Dashboard() {
     pendingServiceRequests: 0,
     missingComplianceBuildings: 0,
   });
+
+  const selectedCollegeName = useMemo(() => {
+    if (!collegeFilter) return "All Colleges";
+  
+    return (
+      colleges.find((college) => String(college.id) === collegeFilter)?.name ||
+      "All Colleges"
+    );
+  }, [colleges, collegeFilter]);
 
   function isAdmin() {
     return role === "admin";
@@ -194,7 +208,7 @@ export default function Dashboard() {
   async function load() {
     try {
       setLoading(true);
-
+  
       const [
         buildingData,
         collegeData,
@@ -211,32 +225,32 @@ export default function Dashboard() {
       
       setBuildings(buildingData || []);
       setColleges(collegeData || []);
-
+  
       const floorsMapping: Record<number, any[]> = {};
       const roomsMapping: Record<number, any[]> = {};
-
+  
       for (const b of buildingData || []) {
         const floors = await getFloorsByBuilding(b.id);
         floorsMapping[b.id] = floors || [];
-
+  
         for (const f of floors || []) {
           roomsMapping[f.id] = await getRoomsByFloor(f.id);
         }
       }
-
+  
       setFloorsMap(floorsMapping);
       setRoomsMap(roomsMapping);
-
+  
       const floorCount = Object.values(floorsMapping).reduce(
         (sum, arr) => sum + arr.length,
         0
       );
-
+  
       const roomCount = Object.values(roomsMapping).reduce(
         (sum, arr) => sum + arr.length,
         0
       );
-
+  
       setStats({
         colleges: collegeData?.length || 0,
         buildings: buildingData?.length || 0,
@@ -251,7 +265,7 @@ export default function Dashboard() {
       });
     } catch (err) {
       console.error("Failed to load dashboard:", err);
-      alert("Failed to load dashboard");
+      showToast("Failed to load dashboard", "error");
     } finally {
       setLoading(false);
     }
@@ -259,41 +273,42 @@ export default function Dashboard() {
 
   async function handleSaveFullName() {
     if (!nameInput.trim()) {
-      alert("Display name cannot be empty.");
+      showToast("Display name cannot be empty.", "warning");
       return;
     }
-
+  
     try {
       setSavingName(true);
-
+  
       const {
         data: { user },
       } = await supabase.auth.getUser();
-
+  
       if (!user) {
-        alert("You must be logged in.");
+        showToast("You must be logged in.", "warning");
         return;
       }
-
+  
       const { error } = await supabase
         .from("profiles")
         .update({
           full_name: nameInput.trim(),
         })
         .eq("id", user.id);
-
+  
       if (error) {
         console.error(error);
-        alert("Failed to save display name.");
+        showToast("Failed to save display name.", "error");
         return;
       }
-
+  
       setFullName(nameInput.trim());
       sessionStorage.setItem("bims_full_name", nameInput.trim());
       setShowNameConfirmModal(false);
+      showToast("Display name saved", "success");
     } catch (err) {
       console.error(err);
-      alert("Failed to save display name.");
+      showToast("Failed to save display name.", "error");
     } finally {
       setSavingName(false);
     }
@@ -303,7 +318,7 @@ export default function Dashboard() {
     const buildingFloors = floorsMap[building.id] || [];
   
     if (buildingFloors.length > 0) {
-      alert("Cannot delete building with existing floors");
+      showToast("Cannot delete building with existing floors", "warning");
       return;
     }
   
@@ -324,9 +339,10 @@ export default function Dashboard() {
       setDeleting(true);
       await deleteModal.onConfirm();
       setDeleteModal(null);
+      showToast("Deleted successfully", "success");
     } catch (err) {
       console.error(err);
-      alert("Delete failed");
+      showToast("Delete failed", "error");
     } finally {
       setDeleting(false);
     }
@@ -335,6 +351,7 @@ export default function Dashboard() {
   function handleClearFilters() {
     setSearch("");
     setCollegeFilter("");
+    setShowCollegeDropdown(false);
   }
 
   const filteredBuildings = useMemo(() => {
@@ -580,9 +597,10 @@ export default function Dashboard() {
                       type="button"
                       onClick={() => {
                         if (!nameInput.trim()) {
-                          alert("Display name cannot be empty.");
+                          showToast("Display name cannot be empty.", "warning");
                           return;
                         }
+                      
                         setShowNameConfirmModal(true);
                       }}
                       className="rounded-lg bg-black px-5 py-3 text-white transition hover:scale-[1.02]"
@@ -674,22 +692,65 @@ export default function Dashboard() {
                     />
                   </div>
 
-                  <div>
+                  <div className="relative">
                     <label className="mb-1 block text-sm font-medium">
                       Filter by College
                     </label>
-                    <select
-                      value={collegeFilter}
-                      onChange={(e) => setCollegeFilter(e.target.value)}
-                      className="w-full rounded-lg border border-upred/30 bg-white/90 p-2"
+
+                    <button
+                      type="button"
+                      onClick={() => setShowCollegeDropdown((prev) => !prev)}
+                      className="flex w-full items-center justify-between rounded-lg border border-upred/30 bg-white/90 p-2 text-left transition hover:border-upred/50"
                     >
-                      <option value="">All Colleges</option>
-                      {colleges.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
+                      <span>{selectedCollegeName}</span>
+
+                      <ChevronDown
+                        className={`h-5 w-5 text-black/50 transition ${
+                          showCollegeDropdown ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+
+                    {showCollegeDropdown && (
+                      <div className="absolute left-0 right-0 z-40 mt-2 max-h-72 overflow-y-auto rounded-xl border border-upred/20 bg-white shadow-xl">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCollegeFilter("");
+                            setShowCollegeDropdown(false);
+                          }}
+                          className={`flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-upred/5 ${
+                            !collegeFilter ? "font-semibold text-upred" : "text-black"
+                          }`}
+                        >
+                          All Colleges
+
+                          {!collegeFilter && <Check className="h-4 w-4" />}
+                        </button>
+
+                        {colleges.map((college) => {
+                          const isSelected = String(college.id) === collegeFilter;
+
+                          return (
+                            <button
+                              key={college.id}
+                              type="button"
+                              onClick={() => {
+                                setCollegeFilter(String(college.id));
+                                setShowCollegeDropdown(false);
+                              }}
+                              className={`flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-upred/5 ${
+                                isSelected ? "font-semibold text-upred" : "text-black"
+                              }`}
+                            >
+                              {college.name}
+
+                              {isSelected && <Check className="h-4 w-4" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
 
                   {(search || collegeFilter) && (
@@ -872,16 +933,18 @@ export default function Dashboard() {
                                           {isAdmin() && (
                                             <button
                                               type="button"
-                                              onClick={async () => {
-                                                try {
-                                                  await deleteRoom(r.id);
-                                                  await load();
-                                                } catch (err) {
-                                                  console.error(err);
-                                                  alert("Failed to delete room");
-                                                }
+                                              onClick={() => {
+                                                setDeleteModal({
+                                                  title: "Delete room?",
+                                                  message: `Are you sure you want to delete Room ${r.room_number}?`,
+                                                  onConfirm: async () => {
+                                                    await deleteRoom(r.id);
+                                                    await load();
+                                                  },
+                                                });
                                               }}
-                                              className="ml-2 text-[#8d1b39]"
+                                              title="Delete room"
+                                              className="ml-2 text-upred transition hover:scale-110"
                                             >
                                               ×
                                             </button>
@@ -911,12 +974,12 @@ export default function Dashboard() {
                                         type="button"
                                         onClick={async () => {
                                           const roomNumber = (newRoom[f.id] || "").trim();
-
+                                        
                                           if (!roomNumber) {
-                                            alert("Room number cannot be empty");
+                                            showToast("Room number cannot be empty", "warning");
                                             return;
                                           }
-
+                                        
                                           try {
                                             await createRoom(f.id, roomNumber);
                                             setNewRoom({
@@ -924,12 +987,14 @@ export default function Dashboard() {
                                               [f.id]: "",
                                             });
                                             await load();
+                                            showToast("Room added", "success");
                                           } catch (err: any) {
                                             console.error(err);
+                                        
                                             if (err.message?.includes("unique_room_per_floor")) {
-                                              alert("That room already exists on this floor");
+                                              showToast("That room already exists on this floor", "warning");
                                             } else {
-                                              alert("Failed to add room");
+                                              showToast("Failed to add room", "error");
                                             }
                                           }
                                         }}
@@ -951,7 +1016,7 @@ export default function Dashboard() {
                                         const floorRooms = roomsMap[f.id] || [];
 
                                         if (floorRooms.length > 0) {
-                                          alert("Cannot delete floor with existing rooms");
+                                          showToast("Cannot delete floor with existing rooms", "warning");
                                           return;
                                         }
 
@@ -999,35 +1064,35 @@ export default function Dashboard() {
                           type="button"
                           onClick={async () => {
                             const existingFloors = floorsMap[b.id] || [];
-
+                          
                             if (!canAddMoreFloors(b.id, b.num_floors)) {
-                              alert("You cannot add more floors than declared");
+                              showToast("You cannot add more floors than declared", "warning");
                               return;
                             }
-
+                          
                             const floorValue = (newFloor[b.id] || "").trim();
-
+                          
                             if (!floorValue) {
-                              alert("Floor number cannot be empty");
+                              showToast("Floor number cannot be empty", "warning");
                               return;
                             }
-
+                          
                             const floorNumber = Number(floorValue);
-
+                          
                             if (Number.isNaN(floorNumber) || floorNumber <= 0) {
-                              alert("Floor number must be a valid positive number");
+                              showToast("Floor number must be a valid positive number", "warning");
                               return;
                             }
-
+                          
                             const alreadyExists = existingFloors.some(
                               (f) => Number(f.floor_number) === floorNumber
                             );
-
+                          
                             if (alreadyExists) {
-                              alert("That floor already exists in this building");
+                              showToast("That floor already exists in this building", "warning");
                               return;
                             }
-
+                          
                             try {
                               await createFloor(b.id, floorNumber);
                               setNewFloor({
@@ -1035,12 +1100,14 @@ export default function Dashboard() {
                                 [b.id]: "",
                               });
                               await load();
+                              showToast("Floor added", "success");
                             } catch (err: any) {
                               console.error(err);
+                          
                               if (err.message?.includes("unique_floor_per_building")) {
-                                alert("That floor already exists in this building");
+                                showToast("That floor already exists in this building", "warning");
                               } else {
-                                alert("Failed to add floor");
+                                showToast("Failed to add floor", "error");
                               }
                             }
                           }}

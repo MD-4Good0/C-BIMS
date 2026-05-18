@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { supabase } from "../supabaseClient";
+import ProfileModal from "../components/ProfileModal";
 
 import BIMS from "../assets/W-BIMS.png";
 
@@ -31,6 +32,7 @@ export default function SideBarLayout({
   children: React.ReactNode;
   background?: string;
 }) {
+
   const location = useLocation();
 
   const [avatarUrl, setAvatarUrl] = useState<string | null>(() => {
@@ -47,6 +49,8 @@ export default function SideBarLayout({
 
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showFade, setShowFade] = useState(false);
+
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   useEffect(() => {
     async function loadUserData() {
@@ -270,12 +274,11 @@ export default function SideBarLayout({
               icon: Info,
             })}
 
-            <Link
-              to="/profile"
-              title="Profile"
-              className={`relative block h-11 w-full overflow-hidden rounded-xl text-white transition-opacity duration-200 hover:opacity-100 ${
-                isActive("/profile") ? "opacity-100" : "opacity-75"
-              }`}
+            <button
+            type="button"
+            title="Profile"
+            onClick={() => setShowProfileModal(true)}
+            className="relative block h-11 w-full overflow-hidden rounded-xl text-white opacity-75 transition-opacity duration-200 hover:opacity-100"
             >
               <span className="absolute left-0 top-0 flex h-11 w-20 items-center justify-center">
                 {avatarUrl ? (
@@ -303,7 +306,7 @@ export default function SideBarLayout({
               >
                 Profile
               </span>
-            </Link>
+            </button>
 
             <button
               type="button"
@@ -382,6 +385,11 @@ export default function SideBarLayout({
           />
         )}
       </AnimatePresence>
+
+      <ProfileModal
+        open={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+      />
 
       <main className="flex-1 overflow-y-auto bg-transparent">{children}</main>
     </div>

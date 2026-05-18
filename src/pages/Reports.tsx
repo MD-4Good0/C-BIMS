@@ -1,25 +1,34 @@
+// src/pages/Reports.tsx
+
 import { useEffect, useMemo, useState } from "react";
 import SidebarLayout from "../layouts/SidebarLayout";
 import { getColleges } from "../colleges";
+import { Check, ChevronDown } from "lucide-react";
+import { useToast } from "../components/ToastProvider";
 import {
   getFieldsForReport,
   complianceReportGroups,
+  complianceReportFields,
   getReportBuildings,
   getReportValue,
-  exportReportToCSV,
-  exportReportToXLSX,
+  exportCombinedReportToCSV,
+  exportCombinedReportToXLSX,
+  exportCleanReportToPDF,
 } from "../reports";
-import type { ReportType } from "../reports";
 
 export default function Reports() {
   const [colleges, setColleges] = useState<any[]>([]);
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const [reportType, setReportType] = useState<ReportType>("building");
   const [selectedFields, setSelectedFields] = useState<string[]>(
     getFieldsForReport("building").map((field) => field.key)
   );
+
+  const [showFilters, setShowFilters] = useState(false);
+  const [showAttributes, setShowAttributes] = useState(false);
+
+  const [showCollegeDropdown, setShowCollegeDropdown] = useState(false);
 
   const [summary, setSummary] = useState({
     totalBuildings: 0,
@@ -34,38 +43,54 @@ export default function Reports() {
     buildingName: "",
   });
 
-  const availableFields = useMemo(() => {
-    return getFieldsForReport(reportType);
-  }, [reportType]);
+  const { showToast } = useToast();
 
-  const selectedFieldDefinitions = useMemo(() => {
-    return availableFields.filter((field) => selectedFields.includes(field.key));
-  }, [availableFields, selectedFields]);
-
-  const availableFieldGroups = useMemo(() => {
-    if (reportType === "compliance") {
-      return complianceReportGroups;
-    }
+  const selectedCollegeName = useMemo(() => {
+    if (!filters.collegeId) return "All Colleges";
   
+    return (
+      colleges.find((college) => String(college.id) === filters.collegeId)?.name ||
+      "All Colleges"
+    );
+  }, [colleges, filters.collegeId]);
+
+  const buildingFields = useMemo(() => {
+    return getFieldsForReport("building");
+  }, []);
+
+  const selectedBuildingFields = useMemo(() => {
+    return buildingFields.filter((field) => selectedFields.includes(field.key));
+  }, [buildingFields, selectedFields]);
+
+  const statCards = useMemo(() => {
     return [
       {
-        title: "Building Data Attributes",
-        fields: availableFields,
+        label: "Buildings",
+        value: summary.totalBuildings,
+        color: "bg-upred",
+      },
+      {
+        label: "Elevator",
+        value: summary.withElevator,
+        color: "bg-upgreen",
+      },
+      {
+        label: "Ramp",
+        value: summary.withRamp,
+        color: "bg-upyellow",
+      },
+      {
+        label: "Structural",
+        value: summary.withoutStructuralIntegrity,
+        color: "bg-upred",
+      },
+      {
+        label: "Attachments",
+        value: summary.withAttachment,
+        color: "bg-upgreen",
       },
     ];
-  }, [reportType, availableFields]);
-  
-  const selectedFieldGroups = useMemo(() => {
-    return availableFieldGroups
-      .map((group) => ({
-        ...group,
-        fields: group.fields.filter((field) => selectedFields.includes(field.key)),
-      }))
-      .filter((group) => group.fields.length > 0);
-  }, [availableFieldGroups, selectedFields]);
-
-  const reportFileName =
-    reportType === "building" ? "building-data-report" : "compliance-report";
+  }, [summary]);
 
   useEffect(() => {
     async function loadColleges() {
@@ -74,35 +99,20 @@ export default function Reports() {
         setColleges(data || []);
       } catch (err) {
         console.error(err);
-        alert("Failed to load colleges");
+        showToast("Failed to load colleges", "error");
       }
     }
-
+  
     loadColleges();
   }, []);
 
   function handleFilterChange(e: any) {
     const { name, value } = e.target;
+
     setFilters((prev) => ({
       ...prev,
       [name]: value,
     }));
-  }
-
-  function handleReportTypeChange(e: any) {
-    const nextReportType = e.target.value as ReportType;
-
-    setReportType(nextReportType);
-    setSelectedFields(getFieldsForReport(nextReportType).map((field) => field.key));
-    setResults([]);
-
-    setSummary({
-      totalBuildings: 0,
-      withElevator: 0,
-      withRamp: 0,
-      withoutStructuralIntegrity: 0,
-      withAttachment: 0,
-    });
   }
 
   function handleFieldToggle(fieldKey: string) {
@@ -116,7 +126,7 @@ export default function Reports() {
   }
 
   function handleSelectAllFields() {
-    setSelectedFields(availableFields.map((field) => field.key));
+    setSelectedFields(buildingFields.map((field) => field.key));
   }
 
   function handleClearSelectedFields() {
@@ -127,7 +137,7 @@ export default function Reports() {
     e.preventDefault();
 
     if (selectedFields.length === 0) {
-      alert("Select at least one attribute");
+      showToast("Select at least one building data attribute", "warning");
       return;
     }
 
@@ -148,7 +158,7 @@ export default function Reports() {
       });
     } catch (err: any) {
       console.error(err);
-      alert(err.message || "Failed to generate report");
+      showToast(err.message || "Failed to generate report", "error");
     } finally {
       setLoading(false);
     }
@@ -156,39 +166,44 @@ export default function Reports() {
 
   function handleExportCSV() {
     if (results.length === 0) {
-      alert("No results to export");
+      showToast("No results to export", "warning");
       return;
     }
-
-    if (selectedFieldDefinitions.length === 0) {
-      alert("Select at least one attribute");
-      return;
-    }
-
-    exportReportToCSV(results, selectedFieldDefinitions, reportFileName);
+  
+    exportCombinedReportToCSV(
+      results,
+      selectedBuildingFields,
+      complianceReportFields,
+      "building-and-compliance-report"
+    );
   }
-
+  
   function handleExportXLSX() {
     if (results.length === 0) {
-      alert("No results to export");
+      showToast("No results to export", "error");
       return;
     }
-
-    if (selectedFieldDefinitions.length === 0) {
-      alert("Select at least one attribute");
-      return;
-    }
-
-    exportReportToXLSX(results, selectedFieldDefinitions, reportFileName);
+  
+    exportCombinedReportToXLSX(
+      results,
+      selectedBuildingFields,
+      complianceReportFields,
+      "building-and-compliance-report"
+    );
   }
-
+  
   function handleExportPDF() {
     if (results.length === 0) {
-      alert("No results to export");
+      showToast("No results to export", "error");
       return;
     }
-
-    window.print();
+  
+    exportCleanReportToPDF(
+      results,
+      selectedBuildingFields,
+      complianceReportGroups,
+      "building-and-compliance-report"
+    );
   }
 
   function handleClearFilters() {
@@ -196,9 +211,10 @@ export default function Reports() {
       collegeId: "",
       buildingName: "",
     });
-
+  
+    setShowCollegeDropdown(false);
     setResults([]);
-
+  
     setSummary({
       totalBuildings: 0,
       withElevator: 0,
@@ -207,22 +223,6 @@ export default function Reports() {
       withAttachment: 0,
     });
   }
-
-  const complianceSummary = useMemo(() => {
-    return {
-      structurallySound: results.filter((b) => b.structural_integrity).length,
-      accessibleRamp: results.filter((b) => b.ramp).length,
-      accessibleElevator: results.filter((b) => b.elevator).length,
-      withPWDRestroom: results.filter((b) => b.pwd_restroom).length,
-      withGenderNeutral: results.filter((b) => b.gender_neutral_restroom).length,
-      withFDAS: results.filter((b) => b.fdas).length,
-      withFireProtection: results.filter((b) => b.fire_protection).length,
-      withVentilation: results.filter((b) => b.ventilation).length,
-      withCMR: results.filter((b) => b.cmr_submission).length,
-      withSMR: results.filter((b) => b.smr_submission).length,
-      withTestingRequirements: results.filter((b) => b.testing_requirements).length,
-    };
-  }, [results]);
 
   return (
     <SidebarLayout background="white">
@@ -254,285 +254,274 @@ export default function Reports() {
         `}
       </style>
 
-      <div className="bg-white min-h-screen p-6">
+      <div className="min-h-screen bg-white p-6">
         <div className="no-print">
-          <h1 className="text-2xl font-bold mb-4">Reports</h1>
-          <p className="text-sm text-gray-500 mb-6">
-            Generate building data reports and compliance summaries.
-          </p>
-
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-            <div className="border rounded-lg p-4 shadow-sm hover:shadow-md transition">
-              <div className="text-sm text-gray-500">Total Buildings</div>
-              <div className="text-2xl font-bold">{summary.totalBuildings}</div>
-            </div>
-
-            <div className="border rounded-lg p-4 shadow-sm hover:shadow-md transition">
-              <div className="text-sm text-gray-500">With Elevator</div>
-              <div className="text-2xl font-bold">{summary.withElevator}</div>
-            </div>
-
-            <div className="border rounded-lg p-4 shadow-sm hover:shadow-md transition">
-              <div className="text-sm text-gray-500">With Ramp</div>
-              <div className="text-2xl font-bold">{summary.withRamp}</div>
-            </div>
-
-            <div className="border rounded-lg p-4 shadow-sm hover:shadow-md transition">
-              <div className="text-sm text-gray-500">No Structural Integrity</div>
-              <div className="text-2xl font-bold">
-                {summary.withoutStructuralIntegrity}
-              </div>
-            </div>
-
-            <div className="border rounded-lg p-4 shadow-sm hover:shadow-md transition">
-              <div className="text-sm text-gray-500">With Attachment</div>
-              <div className="text-2xl font-bold">{summary.withAttachment}</div>
+          <div className="mb-4 flex w-full justify-center">
+            <div className="text-center">
+              <h1 className="text-3xl font-extrabold leading-none text-upred">
+                Reports
+              </h1>
+              <p className="mt-2 text-sm text-black/60">
+                Generate building data and compliance reports side by side.
+              </p>
             </div>
           </div>
 
-          <form
-            onSubmit={handleGenerateReport}
-            className="space-y-4 mb-8 border rounded-lg p-4 shadow-sm hover:shadow-md transition"
-          >
-            <div>
-              <label className="block mb-1 font-medium">Report Type</label>
-              <select
-                value={reportType}
-                onChange={handleReportTypeChange}
-                className="border p-2 rounded w-full"
+          <div className="mb-6 h-px w-full bg-black/10" />
+
+          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-5">
+            {statCards.map((card) => (
+              <div
+                key={card.label}
+                className={`flex min-h-24 flex-col justify-center rounded-2xl border border-white/40 px-5 py-4 shadow-md backdrop-blur-sm ${card.color} text-white/90 transition hover:scale-105 hover:text-white hover:shadow-lg`}
               >
-                <option value="building">Building Data Report</option>
-                <option value="compliance">Compliance Overview Report</option>
-              </select>
+                <div className="text-sm font-medium">{card.label}</div>
+                <div className="text-3xl font-extrabold">{card.value}</div>
+              </div>
+            ))}
+          </div>
+
+          <form onSubmit={handleGenerateReport} className="mb-8">
+            <div className="mb-6 grid grid-cols-1 items-center gap-4 md:grid-cols-[1fr_auto_1fr]">
+              <div />
+
+              <div className="flex justify-center">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className={`rounded-xl bg-upred px-6 py-2 text-sm font-medium text-white transition hover:scale-105 ${
+                    loading ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
+                >
+                  {loading ? "Generating..." : "Generate Report"}
+                </button>
+              </div>
+
+              <div className="flex justify-center gap-3 md:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowFilters((prev) => !prev)}
+                  className={`rounded-xl border border-upgreen/30 px-5 py-2 text-sm font-medium transition ${
+                    showFilters
+                      ? "bg-upgreen text-white"
+                      : "text-upgreen hover:bg-upgreen/10"
+                  }`}
+                >
+                  {showFilters ? "Hide Filters" : "Show Filters"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowAttributes((prev) => !prev)}
+                  className={`rounded-xl border border-upgreen/30 px-5 py-2 text-sm font-medium transition ${
+                    showAttributes
+                      ? "bg-upgreen text-white"
+                      : "text-upgreen hover:bg-upgreen/10"
+                  }`}
+                >
+                  {showAttributes ? "Hide Attributes" : "Attributes"}
+                </button>
+              </div>
             </div>
 
-            <div>
-              <label className="block mb-1 font-medium">College</label>
-              <select
-                name="collegeId"
-                value={filters.collegeId}
-                onChange={handleFilterChange}
-                className="border p-2 rounded w-full"
-              >
-                <option value="">All Colleges</option>
-                {colleges.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {showFilters && (
+              <div className="mb-6 flex w-full justify-center">
+                <div className="grid w-full max-w-4xl grid-cols-1 gap-5 md:grid-cols-2">
+                <div className="relative">
+                  <label className="mb-1 block text-sm font-medium">
+                    College
+                  </label>
 
-            <div>
-              <label className="block mb-1 font-medium">Building Name</label>
-              <input
-                name="buildingName"
-                value={filters.buildingName}
-                onChange={handleFilterChange}
-                placeholder="Search by building name"
-                className="border p-2 rounded w-full"
-              />
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between gap-3 mb-2">
-                <label className="block font-medium">Select Attributes</label>
-
-                <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={handleSelectAllFields}
-                    className="text-sm underline"
+                    onClick={() => setShowCollegeDropdown((prev) => !prev)}
+                    className="flex w-full items-center justify-between rounded-lg border border-upred/30 bg-white/90 p-2 text-left transition hover:border-upred/50"
                   >
-                    Select All
+                    <span>{selectedCollegeName}</span>
+
+                    <ChevronDown
+                      className={`h-5 w-5 text-black/50 transition ${
+                        showCollegeDropdown ? "rotate-180" : ""
+                      }`}
+                    />
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={handleClearSelectedFields}
-                    className="text-sm underline"
-                  >
-                    Clear
-                  </button>
+                  {showCollegeDropdown && (
+                    <div className="absolute left-0 right-0 z-40 mt-2 max-h-72 overflow-y-auto rounded-xl border border-upred/20 bg-white shadow-xl">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFilters((prev) => ({
+                            ...prev,
+                            collegeId: "",
+                          }));
+                          setShowCollegeDropdown(false);
+                        }}
+                        className={`flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-upred/5 ${
+                          !filters.collegeId ? "font-semibold text-upred" : "text-black"
+                        }`}
+                      >
+                        All Colleges
+
+                        {!filters.collegeId && <Check className="h-4 w-4" />}
+                      </button>
+
+                      {colleges.map((college) => {
+                        const isSelected = String(college.id) === filters.collegeId;
+
+                        return (
+                          <button
+                            key={college.id}
+                            type="button"
+                            onClick={() => {
+                              setFilters((prev) => ({
+                                ...prev,
+                                collegeId: String(college.id),
+                              }));
+                              setShowCollegeDropdown(false);
+                            }}
+                            className={`flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-upred/5 ${
+                              isSelected ? "font-semibold text-upred" : "text-black"
+                            }`}
+                          >
+                            {college.name}
+
+                            {isSelected && <Check className="h-4 w-4" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">
+                      Building Name
+                    </label>
+                    <input
+                      name="buildingName"
+                      value={filters.buildingName}
+                      onChange={handleFilterChange}
+                      placeholder="Search by building name"
+                      className="w-full rounded-lg border border-upred/30 bg-white/90 p-2"
+                    />
+                  </div>
+
+                  {(filters.collegeId || filters.buildingName) && (
+                    <div className="flex justify-center md:col-span-2">
+                      <button
+                        type="button"
+                        onClick={handleClearFilters}
+                        className="rounded-xl border border-upgreen/30 px-5 py-2 text-sm font-medium text-upgreen transition hover:bg-upgreen/10"
+                      >
+                        Clear Filters
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
+            )}
 
-              <div className="space-y-4 border rounded p-3 max-h-96 overflow-y-auto">
-                {availableFieldGroups.map((group) => (
-                  <div key={group.title}>
-                    <h3 className="font-semibold text-sm mb-2">{group.title}</h3>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                      {group.fields.map((field) => (
-                        <label key={field.key} className="flex items-center gap-2 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={selectedFields.includes(field.key)}
-                            onChange={() => handleFieldToggle(field.key)}
-                          />
-                          {field.label}
-                        </label>
-                      ))}
-                    </div>
+            {showAttributes && (
+              <div className="mb-6 rounded-2xl border border-upred/15 bg-white/80 p-5 shadow-sm backdrop-blur-sm">
+                <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <h2 className="text-lg font-bold text-black">
+                      Building Data Attributes
+                    </h2>
+                    <p className="text-sm text-black/60">
+                      {selectedFields.length} selected
+                    </p>
                   </div>
-                ))}
-              </div>
-            </div>
 
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="submit"
-                disabled={loading}
-                className={`px-4 py-2 bg-black text-white rounded ${
-                  loading ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-                }`}
-              >
-                {loading ? "Generating..." : "Generate Report"}
-              </button>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={handleSelectAllFields}
+                      className="rounded-xl border border-upgreen/30 px-4 py-2 text-sm font-medium text-upgreen transition hover:bg-upgreen/10"
+                    >
+                      Select All
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleClearSelectedFields}
+                      className="rounded-xl border border-upred/30 px-4 py-2 text-sm font-medium text-upred transition hover:bg-upred/10"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+
+                <div className="max-h-96 overflow-y-auto pr-2">
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                    {buildingFields.map((field) => (
+                      <label
+                        key={field.key}
+                        className="flex items-center gap-2 rounded-lg border border-black/10 bg-white/80 px-3 py-2 text-sm transition hover:bg-upred/5"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedFields.includes(field.key)}
+                          onChange={() => handleFieldToggle(field.key)}
+                        />
+                        {field.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="mb-8 flex flex-wrap items-center justify-center gap-3">
+              <span className="text-sm font-medium text-black/60">Export as:</span>
 
               <button
                 type="button"
                 onClick={handleExportCSV}
                 disabled={results.length === 0}
-                className={`px-4 py-2 border rounded ${
-                  results.length === 0
-                    ? "opacity-50 cursor-not-allowed"
-                    : "cursor-pointer"
+                className={`rounded-xl border border-upgreen/30 px-5 py-2 text-sm font-medium text-upgreen transition hover:bg-upgreen/10 ${
+                  results.length === 0 ? "opacity-50 cursor-not-allowed" : ""
                 }`}
               >
-                Export CSV
+                CSV
               </button>
 
               <button
                 type="button"
                 onClick={handleExportXLSX}
                 disabled={results.length === 0}
-                className={`px-4 py-2 border rounded ${
-                  results.length === 0
-                    ? "opacity-50 cursor-not-allowed"
-                    : "cursor-pointer"
+                className={`rounded-xl border border-upgreen/30 px-5 py-2 text-sm font-medium text-upgreen transition hover:bg-upgreen/10 ${
+                  results.length === 0 ? "opacity-50 cursor-not-allowed" : ""
                 }`}
               >
-                Export XLSX
+                XLSX
               </button>
 
               <button
                 type="button"
                 onClick={handleExportPDF}
                 disabled={results.length === 0}
-                className={`px-4 py-2 border rounded ${
-                  results.length === 0
-                    ? "opacity-50 cursor-not-allowed"
-                    : "cursor-pointer"
+                className={`rounded-xl border border-upgreen/30 px-5 py-2 text-sm font-medium text-upgreen transition hover:bg-upgreen/10 ${
+                  results.length === 0 ? "opacity-50 cursor-not-allowed" : ""
                 }`}
               >
-                Export PDF
-              </button>
-
-              <button
-                type="button"
-                onClick={handleClearFilters}
-                className="px-4 py-2 border rounded cursor-pointer"
-              >
-                Clear Filters
+                PDF
               </button>
             </div>
           </form>
-
-          {reportType === "compliance" && results.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-              <div className="border rounded-lg p-4 shadow-sm hover:shadow-md transition">
-                <div className="text-sm text-gray-500">Structurally Sound</div>
-                <div className="text-2xl font-bold">
-                  {complianceSummary.structurallySound}
-                </div>
-              </div>
-
-              <div className="border rounded-lg p-4 shadow-sm hover:shadow-md transition">
-                <div className="text-sm text-gray-500">With Ramp</div>
-                <div className="text-2xl font-bold">
-                  {complianceSummary.accessibleRamp}
-                </div>
-              </div>
-
-              <div className="border rounded-lg p-4 shadow-sm hover:shadow-md transition">
-                <div className="text-sm text-gray-500">With Elevator</div>
-                <div className="text-2xl font-bold">
-                  {complianceSummary.accessibleElevator}
-                </div>
-              </div>
-
-              <div className="border rounded-lg p-4 shadow-sm hover:shadow-md transition">
-                <div className="text-sm text-gray-500">With PWD Restroom</div>
-                <div className="text-2xl font-bold">
-                  {complianceSummary.withPWDRestroom}
-                </div>
-              </div>
-
-              <div className="border rounded-lg p-4 shadow-sm hover:shadow-md transition">
-                <div className="text-sm text-gray-500">Gender Neutral</div>
-                <div className="text-2xl font-bold">
-                  {complianceSummary.withGenderNeutral}
-                </div>
-              </div>
-
-              <div className="border rounded-lg p-4 shadow-sm hover:shadow-md transition">
-                <div className="text-sm text-gray-500">With FDAS</div>
-                <div className="text-2xl font-bold">
-                  {complianceSummary.withFDAS}
-                </div>
-              </div>
-
-              <div className="border rounded-lg p-4 shadow-sm hover:shadow-md transition">
-                <div className="text-sm text-gray-500">With Fire Protection</div>
-                <div className="text-2xl font-bold">
-                  {complianceSummary.withFireProtection}
-                </div>
-              </div>
-
-              <div className="border rounded-lg p-4 shadow-sm hover:shadow-md transition">
-                <div className="text-sm text-gray-500">With Ventilation</div>
-                <div className="text-2xl font-bold">
-                  {complianceSummary.withVentilation}
-                </div>
-              </div>
-
-              <div className="border rounded-lg p-4 shadow-sm hover:shadow-md transition">
-                <div className="text-sm text-gray-500">With CMR Submission</div>
-                <div className="text-2xl font-bold">
-                  {complianceSummary.withCMR}
-                </div>
-              </div>
-
-              <div className="border rounded-lg p-4 shadow-sm hover:shadow-md transition">
-                <div className="text-sm text-gray-500">With SMR Submission</div>
-                <div className="text-2xl font-bold">
-                  {complianceSummary.withSMR}
-                </div>
-              </div>
-
-              <div className="border rounded-lg p-4 shadow-sm hover:shadow-md transition">
-                <div className="text-sm text-gray-500">
-                  With Testing Requirements
-                </div>
-                <div className="text-2xl font-bold">
-                  {complianceSummary.withTestingRequirements}
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="report-print-area">
-          <h2 className="text-xl font-semibold mb-1">
-            {reportType === "building"
-              ? "Building Data Results"
-              : "Compliance Results"}
-          </h2>
+          <div className="mb-4">
+            <h2 className="text-xl font-bold text-upred">
+              Generated Reports
+            </h2>
 
-          <p className="text-sm text-gray-500 mb-3">
-            {results.length} result{results.length !== 1 && "s"} found
-          </p>
+            <p className="text-sm text-black/60">
+              {results.length} result{results.length !== 1 && "s"} found
+            </p>
+          </div>
 
           {results.length === 0 ? (
             <p className="text-gray-500">
@@ -541,42 +530,73 @@ export default function Reports() {
                 : "No results found. Try adjusting your filters."}
             </p>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-6">
               {results.map((building) => (
                 <div
                   key={building.id}
-                  className="border rounded-lg p-4 shadow-sm hover:shadow-md transition break-inside-avoid"
+                  className="break-inside-avoid rounded-2xl border border-upred/15 bg-white/80 p-5 shadow-sm transition hover:shadow-md"
                 >
-                  <h3 className="text-lg font-bold">{building.building_name}</h3>
-                  <p className="text-sm text-gray-600 mb-3">
-                    {building.colleges?.name || "No College"}
-                  </p>
+                  <div className="mb-5">
+                    <h3 className="text-xl font-bold text-black">
+                      {building.building_name}
+                    </h3>
 
-                  {reportType === "compliance" ? (
-                    <div className="space-y-4">
-                      {selectedFieldGroups.map((group) => (
-                        <div key={group.title}>
-                          <h4 className="font-semibold text-sm mb-2">{group.title}</h4>
+                    <p className="text-sm text-black/60">
+                      {building.colleges?.name || "No College"}
+                    </p>
+                  </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                            {group.fields.map((field) => (
-                              <div key={field.key}>
-                                {field.label}: {getReportValue(building, field.key) || "N/A"}
-                              </div>
-                            ))}
+                  <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                    <div className="rounded-2xl border border-upred/15 bg-white p-4">
+                      <h4 className="mb-3 text-lg font-bold text-upred">
+                        Building Data Report
+                      </h4>
+
+                      <div className="grid grid-cols-1 gap-2 text-sm">
+                        {selectedBuildingFields.map((field) => (
+                          <div
+                          key={field.key}
+                          className="rounded-lg border border-black/10 bg-white/80 px-3 py-2"
+                          >
+                            <span className="font-bold">{field.label}:</span>{" "}
+                            <span className="text-black/70">
+                              {getReportValue(building, field.key) || "N/A"}
+                            </span>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                      {selectedFieldDefinitions.map((field) => (
-                        <div key={field.key}>
-                          {field.label}: {getReportValue(building, field.key) || "N/A"}
-                        </div>
-                      ))}
+
+                    <div className="rounded-2xl border border-upgreen/15 bg-white p-4">
+                      <h4 className="mb-3 text-lg font-bold text-upgreen">
+                        Compliance Report
+                      </h4>
+
+                      <div className="space-y-5">
+                        {complianceReportGroups.map((group) => (
+                          <div key={group.title}>
+                            <h5 className="mb-2 text-sm font-bold text-upred">
+                              {group.title}
+                            </h5>
+
+                            <div className="grid grid-cols-1 gap-2 text-sm">
+                              {group.fields.map((field) => (
+                                <div
+                                key={field.key}
+                                className="rounded-lg border border-black/10 bg-white/80 px-3 py-2"
+                                >
+                                  <span className="font-bold">{field.label}:</span>{" "}
+                                  <span className="text-black/70">
+                                    {getReportValue(building, field.key) || "N/A"}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  )}
+                  </div>
                 </div>
               ))}
             </div>
