@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import SidebarLayout from "../layouts/SidebarLayout";
 import { getColleges } from "../colleges";
 import { Check, ChevronDown } from "lucide-react";
@@ -6,19 +9,23 @@ import { useToast } from "../components/ToastProvider";
 import {
   getFieldsForReport,
   complianceReportGroups,
-  complianceReportFields,
   getReportBuildings,
   getReportValue,
-  exportCombinedReportToCSV,
-  exportCombinedReportToXLSX,
-  exportCleanReportToPDF,
 } from "../reports";
+
+type ReportMode = "building" | "compliance";
+
+type ReportField = {
+  key: string;
+  label: string;
+};
 
 export default function Reports() {
   const [colleges, setColleges] = useState<any[]>([]);
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [reportGenerated, setReportGenerated] = useState(false);
+  const [reportMode, setReportMode] = useState<ReportMode>("building");
 
   const [selectedFields, setSelectedFields] = useState<string[]>(
     getFieldsForReport("building").map((field) => field.key)
@@ -59,6 +66,25 @@ export default function Reports() {
   const selectedBuildingFields = useMemo(() => {
     return buildingFields.filter((field) => selectedFields.includes(field.key));
   }, [buildingFields, selectedFields]);
+
+  const complianceFields = useMemo(() => {
+    const seen = new Set<string>();
+    const fields: ReportField[] = [
+      { key: "building_name", label: "Building Name" },
+      { key: "college", label: "College" },
+    ];
+
+    complianceReportGroups.forEach((group) => {
+      group.fields.forEach((field) => {
+        if (!seen.has(field.key)) {
+          seen.add(field.key);
+          fields.push(field);
+        }
+      });
+    });
+
+    return fields;
+  }, []);
 
   const statCards = useMemo(() => {
     return [
@@ -114,6 +140,19 @@ export default function Reports() {
     });
   }
 
+  function getReportModeLabel(mode: ReportMode) {
+    if (mode === "building") return "Building Data";
+    return "Compliance";
+  }
+
+  function getReportModeDescription() {
+    if (reportMode === "building") {
+      return "Shows the selected raw building inventory fields.";
+    }
+
+    return "Shows a fixed compliance checklist/status view.";
+  }
+
   function handleFilterChange(e: any) {
     const { name, value } = e.target;
 
@@ -144,7 +183,7 @@ export default function Reports() {
   async function handleGenerateReport(e: any) {
     e.preventDefault();
 
-    if (selectedFields.length === 0) {
+    if (reportMode !== "compliance" && selectedFields.length === 0) {
       showToast("Select at least one building data attribute", "warning");
       return;
     }
@@ -171,7 +210,7 @@ export default function Reports() {
       if (rows.length === 0) {
         showToast("No buildings matched the selected filters", "info");
       } else {
-        showToast("Report generated", "success");
+        showToast(`Reports generated`, "success");
       }
     } catch (err: any) {
       console.error(err);
@@ -179,48 +218,6 @@ export default function Reports() {
     } finally {
       setLoading(false);
     }
-  }
-
-  function handleExportCSV() {
-    if (results.length === 0) {
-      showToast("No results to export", "warning");
-      return;
-    }
-
-    exportCombinedReportToCSV(
-      results,
-      selectedBuildingFields,
-      complianceReportFields,
-      "building-and-compliance-report"
-    );
-  }
-
-  function handleExportXLSX() {
-    if (results.length === 0) {
-      showToast("No results to export", "warning");
-      return;
-    }
-
-    exportCombinedReportToXLSX(
-      results,
-      selectedBuildingFields,
-      complianceReportFields,
-      "building-and-compliance-report"
-    );
-  }
-
-  function handleExportPDF() {
-    if (results.length === 0) {
-      showToast("No results to export", "warning");
-      return;
-    }
-
-    exportCleanReportToPDF(
-      results,
-      selectedBuildingFields,
-      complianceReportGroups,
-      "building-and-compliance-report"
-    );
   }
 
   function handleClearFilters() {
@@ -235,7 +232,73 @@ export default function Reports() {
     resetSummary();
   }
 
-  function renderPreviewValue(building: any, fieldKey: string) {
+  function isDateLikeField(fieldKey: string) {
+    return (
+      fieldKey.includes("date") ||
+      fieldKey.includes("issue") ||
+      fieldKey.includes("expiration")
+    );
+  }
+
+  function getComplianceStatusText(building: any, field: ReportField) {
+    if (field.key === "building_name" || field.key === "college") {
+      return String(getReportValue(building, field.key) || "N/A");
+    }
+
+    if (
+      (field.key === "elevator_permit_issue" ||
+        field.key === "elevator_permit_expiration") &&
+      !building.elevator
+    ) {
+      return "Not applicable";
+    }
+
+    if (
+      (field.key === "generator_issue_date" ||
+        field.key === "generator_expiration_date") &&
+      !building.generator
+    ) {
+      return "Not applicable";
+    }
+
+    const raw = building[field.key];
+
+    if (typeof raw === "boolean") {
+      return raw ? "Available" : "Missing";
+    }
+
+    const displayValue = getReportValue(building, field.key);
+
+    if (!displayValue) {
+      return isDateLikeField(field.key) ? "Missing" : "N/A";
+    }
+
+    if (isDateLikeField(field.key)) {
+      return `Available (${displayValue})`;
+    }
+
+    return String(displayValue);
+  }
+
+  function getComplianceStatusClass(building: any, field: ReportField) {
+    const value = getComplianceStatusText(building, field);
+
+    if (value === "Missing") {
+      return "border-upred/20 bg-upred/10 text-upred";
+    }
+
+    if (value === "Not applicable" || value === "N/A") {
+      return "border-black/10 bg-black/5 text-black/60";
+    }
+
+    if (value.startsWith("Available")) {
+      return "border-upgreen/20 bg-upgreen/10 text-upgreen";
+    }
+
+    return "border-black/10 bg-white text-black/70";
+  }
+
+  function renderBuildingValue(building: any, fieldKey: string) {
     if (fieldKey === "file_link") {
       const fileLink =
         typeof building.file_link === "string" ? building.file_link.trim() : "";
@@ -257,6 +320,288 @@ export default function Reports() {
     const value = getReportValue(building, fieldKey);
 
     return <span className="text-black/70">{value || "N/A"}</span>;
+  }
+
+  function renderComplianceValue(building: any, field: ReportField) {
+    const value = getComplianceStatusText(building, field);
+
+    return (
+      <span
+        className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getComplianceStatusClass(
+          building,
+          field
+        )}`}
+      >
+        {value}
+      </span>
+    );
+  }
+
+  function csvEscape(value: any) {
+    if (value === null || value === undefined) return "";
+    return `"${String(value).replace(/"/g, '""')}"`;
+  }
+
+  function downloadCSV(content: string, fileName: string) {
+    const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", fileName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(url);
+  }
+
+  function rowsToCSV(rows: any[][]) {
+    return rows.map((row) => row.map(csvEscape).join(",")).join("\n");
+  }
+
+  function getBuildingTableRows(building: any) {
+    return selectedBuildingFields.map((field) => [
+      field.label,
+      getReportValue(building, field.key) || "N/A",
+    ]);
+  }
+
+  function getComplianceTableRows(building: any, fields: ReportField[]) {
+    return fields.map((field) => [
+      field.label,
+      getComplianceStatusText(building, field),
+    ]);
+  }
+
+  function getBuildingExportRows() {
+    return results.map((building) => {
+      const row: Record<string, any> = {};
+
+      selectedBuildingFields.forEach((field) => {
+        row[field.label] = getReportValue(building, field.key) || "N/A";
+      });
+
+      return row;
+    });
+  }
+
+  function getComplianceExportRows() {
+    return results.map((building) => {
+      const row: Record<string, any> = {};
+
+      complianceFields.forEach((field) => {
+        row[field.label] = getComplianceStatusText(building, field);
+      });
+
+      return row;
+    });
+  }
+
+  function handleExportCSV() {
+    if (results.length === 0) {
+      showToast("No results to export", "warning");
+      return;
+    }
+  
+    if (reportMode === "building") {
+      const header = selectedBuildingFields.map((field) => field.label);
+      const body = results.map((building) =>
+        selectedBuildingFields.map(
+          (field) => getReportValue(building, field.key) || "N/A"
+        )
+      );
+  
+      downloadCSV(rowsToCSV([header, ...body]), "building-data-report.csv");
+      return;
+    }
+  
+    const header = complianceFields.map((field) => field.label);
+    const body = results.map((building) =>
+      complianceFields.map((field) => getComplianceStatusText(building, field))
+    );
+  
+    downloadCSV(rowsToCSV([header, ...body]), "compliance-report.csv");
+  }
+
+  function handleExportXLSX() {
+    if (results.length === 0) {
+      showToast("No results to export", "warning");
+      return;
+    }
+  
+    const workbook = XLSX.utils.book_new();
+  
+    if (reportMode === "building") {
+      const buildingSheet = XLSX.utils.json_to_sheet(getBuildingExportRows());
+      XLSX.utils.book_append_sheet(workbook, buildingSheet, "Building Data");
+      XLSX.writeFile(workbook, "building-data-report.xlsx");
+      return;
+    }
+  
+    const complianceSheet = XLSX.utils.json_to_sheet(getComplianceExportRows());
+    XLSX.utils.book_append_sheet(workbook, complianceSheet, "Compliance");
+    XLSX.writeFile(workbook, "compliance-report.xlsx");
+  }
+
+  function handleExportPDF() {
+    if (results.length === 0) {
+      showToast("No results to export", "warning");
+      return;
+    }
+
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "pt",
+      format: "a4",
+    });
+
+    const margin = 40;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+
+    function getLastY(fallback: number) {
+      return (doc as any).lastAutoTable?.finalY || fallback;
+    }
+
+    function ensureSpace(y: number, needed = 90) {
+      if (y + needed > pageHeight - margin) {
+        doc.addPage();
+        return margin;
+      }
+
+      return y;
+    }
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.setTextColor(141, 20, 54);
+    doc.text(`${getReportModeLabel(reportMode)} Report`, pageWidth / 2, 42, {
+      align: "center",
+    });
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(80, 80, 80);
+    doc.text(`${results.length} result${results.length !== 1 ? "s" : ""} found`, pageWidth / 2, 60, {
+      align: "center",
+    });
+
+    let y = 90;
+
+    results.forEach((building, index) => {
+      if (index > 0) {
+        doc.addPage();
+        y = margin;
+      }
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.setTextColor(0, 0, 0);
+      doc.text(String(building.building_name || "Unnamed Building"), margin, y);
+
+      y += 16;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(80, 80, 80);
+      doc.text(String(building.colleges?.name || "No College"), margin, y);
+
+      y += 28;
+
+      if (reportMode === "building") {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(12);
+        doc.setTextColor(141, 20, 54);
+        doc.text("Building Data Report", margin, y);
+
+        y += 10;
+
+        autoTable(doc, {
+          startY: y,
+          theme: "grid",
+          styles: {
+            font: "helvetica",
+            fontSize: 9,
+            cellPadding: 6,
+            lineColor: [220, 220, 220],
+            lineWidth: 0.5,
+            overflow: "linebreak",
+          },
+          columnStyles: {
+            0: {
+              fontStyle: "bold",
+              fillColor: [247, 247, 247],
+              cellWidth: 190,
+            },
+            1: {
+              cellWidth: pageWidth - margin * 2 - 190,
+            },
+          },
+          body: getBuildingTableRows(building),
+          margin: {
+            left: margin,
+            right: margin,
+          },
+        });
+
+        y = getLastY(y) + 26;
+      }
+
+      if (reportMode === "compliance") {
+        y = ensureSpace(y, 100);
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(12);
+        doc.setTextColor(0, 86, 63);
+        doc.text("Compliance Report", margin, y);
+
+        y += 20;
+
+        complianceReportGroups.forEach((group) => {
+          y = ensureSpace(y, 100);
+
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(10);
+          doc.setTextColor(141, 20, 54);
+          doc.text(group.title, margin, y);
+
+          y += 8;
+
+          autoTable(doc, {
+            startY: y,
+            theme: "grid",
+            styles: {
+              font: "helvetica",
+              fontSize: 9,
+              cellPadding: 6,
+              lineColor: [220, 220, 220],
+              lineWidth: 0.5,
+              overflow: "linebreak",
+            },
+            columnStyles: {
+              0: {
+                fontStyle: "bold",
+                fillColor: [247, 247, 247],
+                cellWidth: 190,
+              },
+              1: {
+                cellWidth: pageWidth - margin * 2 - 190,
+              },
+            },
+            body: getComplianceTableRows(building, group.fields),
+            margin: {
+              left: margin,
+              right: margin,
+            },
+          });
+
+          y = getLastY(y) + 20;
+        });
+      }
+    });
+
+    doc.save(`${reportMode}-report.pdf`);
   }
 
   return (
@@ -297,7 +642,7 @@ export default function Reports() {
                 Reports
               </h1>
               <p className="mt-2 text-sm text-black/60">
-                Generate building data and compliance reports side by side.
+                Generate building inventory reports or compliance checklist reports.
               </p>
             </div>
           </div>
@@ -317,22 +662,29 @@ export default function Reports() {
           </div>
 
           <form onSubmit={handleGenerateReport} className="mb-8">
-            <div className="mb-6 grid grid-cols-1 items-center gap-4 md:grid-cols-[1fr_auto_1fr]">
+            <div className="mb-6 grid grid-cols-1 items-center gap-4 lg:grid-cols-[1fr_auto_1fr]">
               <div />
 
               <div className="flex justify-center">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className={`rounded-xl border border-upgreen/30 px-6 py-2 text-sm font-medium text-upgreen transition hover:bg-upgreen/10 ${
-                    loading ? "cursor-not-allowed opacity-50" : ""
-                  }`}
-                >
-                  {loading ? "Generating..." : "Generate Report"}
-                </button>
+                <div className="inline-flex overflow-hidden rounded-xl border border-black/10 bg-white/90">
+                {(["building", "compliance"] as ReportMode[]).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setReportMode(mode)}
+                    className={`px-5 py-2 text-sm font-medium transition ${
+                      reportMode === mode
+                        ? "bg-upgreen/10 text-upgreen"
+                        : "text-black/60 hover:bg-upgreen/10 hover:text-upgreen"
+                    }`}
+                  >
+                    {getReportModeLabel(mode)}
+                  </button>
+                ))}
+                </div>
               </div>
 
-              <div className="flex justify-center gap-3 md:justify-end">
+              <div className="flex justify-center gap-3 lg:justify-end">
                 <button
                   type="button"
                   onClick={() => setShowFilters((prev) => !prev)}
@@ -345,19 +697,25 @@ export default function Reports() {
                   {showFilters ? "Hide Filters" : "Show Filters"}
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => setShowAttributes((prev) => !prev)}
-                  className={`rounded-xl border border-upgreen/30 px-5 py-2 text-sm font-medium transition ${
-                    showAttributes
-                      ? "bg-upgreen/10 text-upgreen"
-                      : "text-upgreen hover:bg-upgreen/10"
-                  }`}
-                >
-                  {showAttributes ? "Hide Attributes" : "Attributes"}
-                </button>
+                {reportMode !== "compliance" && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAttributes((prev) => !prev)}
+                    className={`rounded-xl border border-upgreen/30 px-5 py-2 text-sm font-medium transition ${
+                      showAttributes
+                        ? "bg-upgreen/10 text-upgreen"
+                        : "text-upgreen hover:bg-upgreen/10"
+                    }`}
+                  >
+                    {showAttributes ? "Hide Attributes" : "Attributes"}
+                  </button>
+                )}
               </div>
             </div>
+
+            <p className="mb-6 text-center text-sm text-black/50">
+              {getReportModeDescription()}
+            </p>
 
             {showFilters && (
               <div className="mb-6 flex w-full justify-center">
@@ -460,7 +818,7 @@ export default function Reports() {
               </div>
             )}
 
-            {showAttributes && (
+            {reportMode !== "compliance" && showAttributes && (
               <div className="mb-6 rounded-2xl border border-upred/15 bg-white/80 p-5 shadow-sm backdrop-blur-sm">
                 <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div>
@@ -527,6 +885,16 @@ export default function Reports() {
             )}
 
             <div className="mb-8 flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="submit"
+                disabled={loading}
+                className={`rounded-xl border border-upgreen/30 px-6 py-2 text-sm font-medium text-upgreen transition hover:bg-upgreen/10 ${
+                  loading ? "cursor-not-allowed opacity-50" : ""
+                }`}
+              >
+                {loading ? "Generating..." : "Generate Report"}
+              </button>
+
               <span className="text-sm font-medium text-black/60">
                 Export as:
               </span>
@@ -575,7 +943,9 @@ export default function Reports() {
 
         <div className="report-print-area">
           <div className="mb-4">
-            <h2 className="text-xl font-bold text-upred">Generated Reports</h2>
+            <h2 className="text-xl font-bold text-upred">
+              {getReportModeLabel(reportMode)} Report
+            </h2>
 
             <p className="text-sm text-black/60">
               {results.length} result{results.length !== 1 && "s"} found
@@ -586,7 +956,7 @@ export default function Reports() {
             <p className="text-gray-500">Generating report...</p>
           ) : !reportGenerated ? (
             <p className="text-gray-500">
-              Generate a report to display building and compliance results.
+              Generate a report to display results.
             </p>
           ) : results.length === 0 ? (
             <p className="text-gray-500">
@@ -609,54 +979,64 @@ export default function Reports() {
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-                    <div className="rounded-2xl border border-upred/15 bg-white p-4">
-                      <h4 className="mb-3 text-lg font-bold text-upred">
-                        Building Data Report
-                      </h4>
+                  <div className="grid grid-cols-1 gap-5">
+                    {reportMode === "building" && (
+                      <div className="rounded-2xl border border-upred/15 bg-white p-4">
+                        <h4 className="mb-3 text-lg font-bold text-upred">
+                          Building Data Report
+                        </h4>
 
-                      <div className="grid grid-cols-1 gap-2 text-sm">
-                        {selectedBuildingFields.map((field) => (
-                          <div
-                            key={field.key}
-                            className="rounded-lg border border-black/10 bg-white/80 px-3 py-2"
-                          >
-                            <span className="font-bold">{field.label}:</span>{" "}
-                            {renderPreviewValue(building, field.key)}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                        <div className="grid grid-cols-1 gap-2 text-sm">
+                          {selectedBuildingFields.map((field) => (
+                            <div
+                              key={field.key}
+                              className="flex items-start justify-between gap-6 rounded-lg border border-black/10 bg-white/80 px-4 py-3"
+                            >
+                              <span className="shrink-0 font-bold text-black">
+                                {field.label}:
+                              </span>
 
-                    <div className="rounded-2xl border border-upgreen/15 bg-white p-4">
-                      <h4 className="mb-3 text-lg font-bold text-upgreen">
-                        Compliance Report
-                      </h4>
-
-                      <div className="space-y-5">
-                        {complianceReportGroups.map((group) => (
-                          <div key={group.title}>
-                            <h5 className="mb-2 text-sm font-bold text-upred">
-                              {group.title}
-                            </h5>
-
-                            <div className="grid grid-cols-1 gap-2 text-sm">
-                              {group.fields.map((field) => (
-                                <div
-                                  key={field.key}
-                                  className="rounded-lg border border-black/10 bg-white/80 px-3 py-2"
-                                >
-                                  <span className="font-bold">
-                                    {field.label}:
-                                  </span>{" "}
-                                  {renderPreviewValue(building, field.key)}
-                                </div>
-                              ))}
+                              <div className="min-w-0 text-right text-black/70">
+                                {renderBuildingValue(building, field.key)}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
+
+                    {reportMode === "compliance" && (
+                      <div className="rounded-2xl border border-upgreen/15 bg-white p-4">
+                        <h4 className="mb-3 text-lg font-bold text-upgreen">
+                          Compliance Checklist
+                        </h4>
+
+                        <div className="space-y-5">
+                          {complianceReportGroups.map((group) => (
+                            <div key={group.title}>
+                              <h5 className="mb-2 text-sm font-bold text-upred">
+                                {group.title}
+                              </h5>
+
+                              <div className="grid grid-cols-1 gap-2 text-sm">
+                                {group.fields.map((field) => (
+                                  <div
+                                    key={field.key}
+                                    className="flex items-center justify-between gap-3 rounded-lg border border-black/10 bg-white/80 px-3 py-2"
+                                  >
+                                    <span className="font-bold">
+                                      {field.label}
+                                    </span>
+
+                                    {renderComplianceValue(building, field)}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

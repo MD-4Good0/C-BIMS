@@ -343,8 +343,8 @@ export default function AdminColleges() {
             </div>
 
             <div className="mb-6 grid grid-cols-1 gap-5 lg:grid-cols-[1fr_1fr]">
-              <div className="rounded-2xl border border-upred/15 bg-white/80 p-5 shadow-sm backdrop-blur-sm">
-                <h2 className="text-lg font-bold text-upred">Add College</h2>
+              <div className="rounded-2xl border border-upgreen/15 bg-white/80 p-5 shadow-sm backdrop-blur-sm">
+                <h2 className="text-lg font-bold text-upgreen">Add College</h2>
 
                 <p className="mt-1 text-sm text-black/60">
                   Create a new college option for building records.
@@ -355,14 +355,14 @@ export default function AdminColleges() {
                     placeholder="New college name"
                     value={newCollege}
                     onChange={(e) => setNewCollege(e.target.value)}
-                    className="w-full rounded-lg border border-upred/30 bg-white/90 p-3"
+                    className="w-full rounded-lg border border-upgreen/30 bg-white/90 p-3"
                   />
 
                   <button
                     type="button"
                     onClick={handleCreate}
                     disabled={processing}
-                    className="rounded-xl bg-upred px-5 py-3 text-sm font-medium text-white transition hover:scale-105 disabled:opacity-50"
+                    className="rounded-xl bg-upgreen px-5 py-3 text-sm font-medium text-white transition hover:scale-105 disabled:opacity-50"
                   >
                     Add
                   </button>
