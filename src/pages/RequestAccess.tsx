@@ -182,10 +182,14 @@ export default function RequestAccess() {
   }
 
   return (
-    <div
-      className="relative flex min-h-screen items-center justify-center overflow-hidden bg-black bg-cover bg-center px-6 font-poppins"
-      style={{ backgroundImage: `url(${LoginBG})` }}
-    >
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-black px-6 font-poppins">
+      <div className="absolute inset-0 bg-black" />
+
+      <div
+        className="absolute inset-0 bg-cover bg-center"
+        style={{ backgroundImage: `url(${LoginBG})` }}
+      />
+
       <div className="absolute inset-0 bg-black/30" />
 
       <motion.div

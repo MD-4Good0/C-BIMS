@@ -50,20 +50,32 @@ export default function Login() {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-  
-      if (session) {
-        if (isPopupWindow) {
+    
+      if (isPopupWindow) {
+        if (session) {
           window.opener.postMessage(
             {
               type: "BIMS_AUTH_SUCCESS",
             },
-            "*"
+            window.location.origin
           );
-  
+    
           window.close();
           return;
         }
-  
+    
+        window.opener.postMessage(
+          {
+            type: "BIMS_AUTH_CANCELLED",
+          },
+          window.location.origin
+        );
+    
+        window.close();
+        return;
+      }
+    
+      if (session) {
         redirectAfterLogin(true);
       }
     }
@@ -104,8 +116,14 @@ export default function Login() {
         event.origin === window.location.origin ||
         event.origin.endsWith(".vercel.app");
   
-      if (!isAllowedOrigin) return;
-      if (event.data?.type !== "BIMS_AUTH_SUCCESS") return;
+        if (!isAllowedOrigin) return;
+
+        if (event.data?.type === "BIMS_AUTH_CANCELLED") {
+          setLoggingIn(false);
+          return;
+        }
+        
+        if (event.data?.type !== "BIMS_AUTH_SUCCESS") return;
   
       supabase.auth.getSession().then(({ data }) => {
         setLoggingIn(false);
@@ -186,12 +204,15 @@ export default function Login() {
   };
   
   return (
-    <div
-      className="relative font-poppins flex justify-center items-center h-screen bg-black bg-cover bg-center gap-20"
-      style={{ backgroundImage: `url(${LoginBG})` }}
-    >
-      {/* Dark overlay */}
-      <div className="absolute inset-0 bg-black/20"></div>
+    <div className="relative font-poppins flex justify-center items-center h-screen overflow-hidden bg-black gap-20">
+      <div className="absolute inset-0 bg-black" />
+
+      <div
+        className="absolute inset-0 bg-cover bg-center"
+        style={{ backgroundImage: `url(${LoginBG})` }}
+      />
+
+      <div className="absolute inset-0 bg-black/20" />
 
       {/* Login Card */}
       <motion.div

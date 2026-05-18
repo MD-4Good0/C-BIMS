@@ -6,11 +6,15 @@ import { motion } from "framer-motion"
 export default function About() {
   return (
     <SidebarLayout background={AboutBG}>
-      <div
-        className="relative font-poppins flex justify-center items-center h-screen bg-black bg-cover bg-center"
-        style={{ backgroundImage: `url(${AboutBG})` }}
-      >
-        <div className="absolute inset-0 bg-black/50"></div>
+      <div className="relative font-poppins flex justify-center items-center h-screen overflow-hidden bg-black">
+        <div className="absolute inset-0 bg-black" />
+
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url(${AboutBG})` }}
+        />
+
+        <div className="absolute inset-0 bg-black/50" />
         <div className="relative z-10 flex flex-col gap-10 items-center m-5">
           <motion.div
             initial={{ opacity: 0, y: -20 }}
