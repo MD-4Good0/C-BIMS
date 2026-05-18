@@ -4,8 +4,6 @@ import { X } from "lucide-react";
 import { useToast } from "./ToastProvider";
 import { supabase } from "../supabaseClient";
 
-type ProfileStatus = "approved" | "pending" | "rejected" | "";
-
 type ProfileModalProps = {
   open: boolean;
   onClose: () => void;
@@ -19,7 +17,6 @@ export default function ProfileModal({ open, onClose }: ProfileModalProps) {
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
   const [role, setRole] = useState("");
-  const [status, setStatus] = useState<ProfileStatus>("");
 
   const { showToast } = useToast();
 
@@ -42,7 +39,6 @@ export default function ProfileModal({ open, onClose }: ProfileModalProps) {
         setEmail("");
         setFullName("");
         setRole("");
-        setStatus("");
         return;
       }
 
@@ -64,11 +60,10 @@ export default function ProfileModal({ open, onClose }: ProfileModalProps) {
       if (data) {
         const loadedName = data.full_name || "";
         const loadedRole = data.role || "";
-        const loadedStatus = (data.status as ProfileStatus) || "";
+        const loadedStatus = data.status || "";
 
         setFullName(loadedName);
         setRole(loadedRole);
-        setStatus(loadedStatus);
 
         if (loadedName) {
           sessionStorage.setItem("bims_full_name", loadedName);
@@ -84,7 +79,6 @@ export default function ProfileModal({ open, onClose }: ProfileModalProps) {
       } else {
         setFullName("");
         setRole("");
-        setStatus("");
         sessionStorage.removeItem("bims_role");
       }
     } catch (err) {
