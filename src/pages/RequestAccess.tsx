@@ -6,10 +6,12 @@ import { useToast } from "../components/ToastProvider";
 import LoginBG from "../assets/LoginBG.png";
 import PrivacyNotice from "../assets/PrivacyNotice.png";
 
+type RequestedRole = "staff" | "chief";
+
 type AccessStatus =
   | "loading"
   | "no_user"
-  | "no_profile"
+  | "needs_request"
   | "pending"
   | "rejected"
   | "approved"
@@ -19,7 +21,7 @@ export default function RequestAccess() {
   const { showToast } = useToast();
 
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<"staff" | "chief">("staff");
+  const [role, setRole] = useState<RequestedRole>("staff");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [justSubmitted, setJustSubmitted] = useState(false);
@@ -32,56 +34,75 @@ export default function RequestAccess() {
   }, []);
 
   useEffect(() => {
-    async function loadState() {
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        if (!user) {
-          setStatus("no_user");
-          setLoading(false);
-          return;
-        }
-
-        setEmail(user.email || "");
-
-        const { data: profile, error } = await supabase
-          .from("profiles")
-          .select("id, email, role, status")
-          .eq("id", user.id)
-          .maybeSingle();
-
-        if (error) {
-          console.error(error);
-          setStatus("unknown");
-          setLoading(false);
-          return;
-        }
-
-        if (!profile) {
-          setStatus("no_profile");
-          setLoading(false);
-          return;
-        }
-
-        setRole(profile.role === "chief" ? "chief" : "staff");
-
-        if (profile.status === "pending") setStatus("pending");
-        else if (profile.status === "rejected") setStatus("rejected");
-        else if (profile.status === "approved") setStatus("approved");
-        else setStatus("unknown");
-
-        setLoading(false);
-      } catch (err) {
-        console.error(err);
-        setStatus("unknown");
-        setLoading(false);
-      }
-    }
-
     loadState();
   }, []);
+
+  async function loadState() {
+    try {
+      setLoading(true);
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        setStatus("no_user");
+        return;
+      }
+
+      setEmail(user.email || "");
+
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("id, email, role, status, access_requested")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error(error);
+        setStatus("unknown");
+        return;
+      }
+
+      if (!profile) {
+        setStatus("needs_request");
+        return;
+      }
+
+      if (profile.role === "chief") {
+        setRole("chief");
+      } else {
+        setRole("staff");
+      }
+
+      if (profile.status === "approved") {
+        setStatus("approved");
+        return;
+      }
+
+      if (profile.status === "rejected") {
+        setStatus("rejected");
+        return;
+      }
+
+      if (profile.status === "pending") {
+        if (profile.access_requested) {
+          setStatus("pending");
+        } else {
+          setStatus("needs_request");
+        }
+
+        return;
+      }
+
+      setStatus("needs_request");
+    } catch (err) {
+      console.error(err);
+      setStatus("unknown");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -100,19 +121,19 @@ export default function RequestAccess() {
         return;
       }
 
-      const { error } = await supabase
-        .from("profiles")
-        .upsert(
-          [
-            {
-              id: user.id,
-              email: user.email,
-              role,
-              status: "pending",
-            },
-          ],
-          { onConflict: "id" }
-        );
+      const { error } = await supabase.from("profiles").upsert(
+        [
+          {
+            id: user.id,
+            email: user.email,
+            role,
+            status: "pending",
+            access_requested: true,
+            requested_at: new Date().toISOString(),
+          },
+        ],
+        { onConflict: "id" }
+      );
 
       if (error) {
         console.error(error);
@@ -131,6 +152,10 @@ export default function RequestAccess() {
     }
   }
 
+  function handleCancel() {
+    window.history.back();
+  }
+  
   async function handleLogout() {
     await supabase.auth.signOut();
     window.location.href = "/";
@@ -178,8 +203,11 @@ export default function RequestAccess() {
       return "Something went wrong while checking your access.";
     }
 
-    return "Your account is not yet allowed to enter the system.";
+    return "Choose the role you want to request before submitting access.";
   }
+
+  const shouldShowRequestForm =
+    status === "needs_request" || status === "rejected";
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-black px-6 font-poppins">
@@ -224,7 +252,7 @@ export default function RequestAccess() {
               </div>
             ) : (
               <>
-                {(status === "no_profile" || status === "rejected") && (
+                {shouldShowRequestForm && (
                   <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
                       <label className="mb-1 block text-sm font-medium text-white/85">
@@ -268,6 +296,11 @@ export default function RequestAccess() {
                           Chief
                         </button>
                       </div>
+
+                      <p className="mt-2 text-xs leading-5 text-white/65">
+                        Your selected role will be sent to the administrator for
+                        approval.
+                      </p>
                     </div>
 
                     <div className="flex flex-col gap-3 pt-2 sm:flex-row">
@@ -281,11 +314,11 @@ export default function RequestAccess() {
 
                       <button
                         type="button"
-                        onClick={handleLogout}
+                        onClick={handleCancel}
                         disabled={submitting}
                         className="flex-1 rounded-full border border-white/40 px-5 py-3 text-sm font-semibold text-white transition hover:scale-[1.02] hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        Logout
+                        Back
                       </button>
                     </div>
                   </form>
@@ -310,7 +343,7 @@ export default function RequestAccess() {
                       onClick={handleLogout}
                       className="w-full rounded-full bg-white px-5 py-3 text-sm font-semibold text-upred shadow-md transition hover:scale-[1.02] hover:bg-upgreen hover:text-white"
                     >
-                      Logout
+                      Go Back
                     </button>
                   </div>
                 )}

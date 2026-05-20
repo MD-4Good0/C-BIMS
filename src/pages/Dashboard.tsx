@@ -972,7 +972,7 @@ export default function Dashboard() {
                     onClick={() => setViewMode("hierarchy")}
                     className={`px-5 py-2 text-sm font-medium transition ${
                       viewMode === "hierarchy"
-                        ? "bg-upred/25 text-upred"
+                        ? "bg-upred/25 text-black"
                         : "text-upred hover:bg-upred/10"
                     }`}
                   >
@@ -984,7 +984,7 @@ export default function Dashboard() {
                     onClick={() => setViewMode("table")}
                     className={`px-5 py-2 text-sm font-medium transition ${
                       viewMode === "table"
-                        ? "bg-upred/25 text-upred"
+                        ? "bg-upred/25 text-black"
                         : "text-upred hover:bg-upred/10"
                     }`}
                   >
@@ -999,7 +999,7 @@ export default function Dashboard() {
                   onClick={() => setShowFilters((prev) => !prev)}
                   className={`rounded-xl border border-upgreen/30 px-5 py-2 text-sm font-medium transition ${
                     showFilters
-                      ? "bg-upyellow/25 text-black"
+                      ? "bg-upgreen/15 text-black"
                       : "text-upgreen hover:bg-upgreen/10"
                   }`}
                 >

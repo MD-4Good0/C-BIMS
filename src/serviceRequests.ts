@@ -7,7 +7,12 @@ export async function getServiceRequests() {
       *,
       buildings (
         id,
-        building_name
+        building_name,
+        college_id,
+        colleges (
+          id,
+          name
+        )
       ),
       floors (
         id,

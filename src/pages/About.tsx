@@ -1,60 +1,74 @@
-import SidebarLayout from "../layouts/SidebarLayout"
-import AboutBG from '../assets/AboutBG.jpg'
-
-import { motion } from "framer-motion"
+import SidebarLayout from "../layouts/SidebarLayout";
+import AboutBG from "../assets/AboutBG.jpg";
+import { motion } from "framer-motion";
 
 export default function About() {
   return (
     <SidebarLayout background={AboutBG}>
-      <div className="relative font-poppins flex justify-center items-center h-screen overflow-hidden bg-black">
-        <div className="absolute inset-0 bg-black" />
-
+      <div className="relative min-h-screen overflow-y-auto bg-black font-poppins">
         <div
-          className="absolute inset-0 bg-cover bg-center"
+          className="fixed inset-0 bg-cover bg-center"
           style={{ backgroundImage: `url(${AboutBG})` }}
         />
 
-        <div className="absolute inset-0 bg-black/50" />
-        <div className="relative z-10 flex flex-col gap-10 items-center m-5">
+        <div className="fixed inset-0 bg-black/60" />
+
+        <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col items-center justify-center px-6 py-16">
           <motion.div
-            initial={{ opacity: 0, y: -20 }}
+            initial={{ opacity: 0, y: -18 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
+            className="mb-10 text-center"
           >
-            <div className="text-center text-3xl font-light text-white mb-3">University of the Philippines Manila's</div>
-            <div className="text-center text-4xl font-extrabold text-white/80">Building Inventory Management System</div>
+            <p className="text-lg font-light leading-tight text-white/80 sm:text-xl md:text-2xl">
+              University of the Philippines Manila&apos;s
+            </p>
+
+            <h1 className="mt-2 text-3xl font-extrabold leading-tight text-white sm:text-4xl md:text-5xl">
+              Building Inventory Management System
+            </h1>
           </motion.div>
 
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="flex flex-col items-center backdrop-blur-sm bg-upyellow/60 rounded-lg px-15 py-10 w-full
-            sm:w-4/5 md:w-3/4 lg:w-2/3 xl:w-1/2 mx-auto gap-5 text-white/60 hover:scale-105 transition hover:text-white"
-          >
-            <h1 className="font-bold text-3xl">ABOUT</h1>
-            <p className="text-center text-base">
-              The UP Manila Buildings Inventory Management System—UPM BIMS—is an architectural inventory that records
-              the different attributes of university buildings. It also visualizes the organization of rooms on the floors
-              within each college's buildings.
-            </p>
-          </motion.div>
+          <div className="grid w-full grid-cols-1 gap-6 lg:grid-cols-2">
+            <motion.section
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.15 }}
+              className="rounded-2xl border border-white/20 bg-upyellow/55 px-8 py-8 text-center text-white shadow-xl backdrop-blur-md transition-transform duration-300 hover:scale-[1.03]"
+            >
+              <h2 className="mb-5 text-3xl font-extrabold tracking-wide">
+                ABOUT
+              </h2>
 
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.4 }}
-            className="flex flex-col items-center backdrop-blur-sm bg-upgreen/60 rounded-lg px-15 py-10 w-full
-            sm:w-4/5 md:w-3/4 lg:w-2/3 xl:w-1/2 mx-auto gap-5 text-white/60 hover:scale-105 transition hover:text-white"
-          >
-            <h1 className="font-bold text-3xl">MISSION</h1>
-            <p className="text-center text-base">
-            To maintain an updated record of the physical, regulatory, and compliance information of the buildings of the University of the Philippines Manila.
-            This system also aims to provide on-the-go reports for the different statuses of UP Manila buildings.
-            </p>
-          </motion.div>
+              <p className="mx-auto max-w-xl text-base leading-8 text-white/90">
+                The UP Manila Buildings Inventory Management System, or UPM BIMS,
+                is an architectural inventory that records the different
+                attributes of university buildings. It also visualizes the
+                organization of rooms on the floors within each college&apos;s
+                buildings.
+              </p>
+            </motion.section>
+
+            <motion.section
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+              className="rounded-2xl border border-white/20 bg-upgreen/85 px-8 py-8 text-center text-white shadow-xl backdrop-blur-md transition-transform duration-300 hover:scale-[1.03]"
+            >
+              <h2 className="mb-5 text-3xl font-extrabold tracking-wide">
+                MISSION
+              </h2>
+
+              <p className="mx-auto max-w-xl text-base leading-8 text-white/90">
+                To maintain an updated record of the physical, regulatory, and
+                compliance information of the buildings of the University of the
+                Philippines Manila. This system also aims to provide on-the-go
+                reports for the different statuses of UP Manila buildings.
+              </p>
+            </motion.section>
+          </div>
         </div>
       </div>
     </SidebarLayout>
-  )
+  );
 }

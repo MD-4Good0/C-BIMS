@@ -226,22 +226,30 @@ export default function AdminUsers() {
       {
         label: "Users",
         value: allUsers.length,
-        color: "bg-upred",
+        color: "bg-white",
+        text: "text-black",
+        border: "border-black/10",
       },
       {
         label: "Pending",
         value: pending.length,
         color: "bg-upyellow",
+        text: "text-white",
+        border: "border-white/40",
       },
       {
         label: "Approved",
         value: approved.length,
         color: "bg-upgreen",
+        text: "text-white",
+        border: "border-white/40",
       },
       {
         label: "Rejected",
         value: rejected.length,
         color: "bg-upred",
+        text: "text-white",
+        border: "border-white/40",
       },
     ];
   }, [allUsers.length, pending.length, approved.length, rejected.length]);
@@ -322,7 +330,7 @@ export default function AdminUsers() {
               {statCards.map((card) => (
                 <div
                   key={card.label}
-                  className={`flex min-h-24 flex-col justify-center rounded-2xl border border-white/40 px-5 py-4 shadow-md backdrop-blur-sm ${card.color} text-white/90 transition hover:scale-105 hover:text-white hover:shadow-lg`}
+                  className={`flex min-h-24 flex-col justify-center rounded-2xl border px-5 py-4 shadow-md backdrop-blur-sm ${card.border} ${card.color} ${card.text} transition hover:scale-105 hover:shadow-lg`}
                 >
                   <div className="text-sm font-medium">{card.label}</div>
                   <div className="text-3xl font-extrabold">{card.value}</div>

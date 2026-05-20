@@ -12,8 +12,22 @@ import {
 import { getBuildings } from "../buildings";
 import { getFloorsByBuilding } from "../floors";
 import { getRoomsByFloor } from "../rooms";
+import { getColleges } from "../colleges";
 
-type StatusType = "pending" | "cancelled" | "resolved";
+type StatusType =
+  | "pending"
+  | "acknowledged"
+  | "resolved"
+  | "rejected"
+  | "cancelled";
+
+function normalizeText(value: any) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
 
 export default function ServiceRequests() {
   const { showToast } = useToast();
@@ -22,19 +36,24 @@ export default function ServiceRequests() {
   const [role, setRole] = useState<string | null>(() => {
     return sessionStorage.getItem("bims_role");
   });
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
   const [loadingRequests, setLoadingRequests] = useState(true);
 
   const [statusFilter, setStatusFilter] = useState("");
+  const [collegeFilter, setCollegeFilter] = useState("");
   const [search, setSearch] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [showRequestForm, setShowRequestForm] = useState(false);
 
+  const [colleges, setColleges] = useState<any[]>([]);
   const [buildings, setBuildings] = useState<any[]>([]);
   const [floors, setFloors] = useState<any[]>([]);
   const [rooms, setRooms] = useState<any[]>([]);
 
+  const [showCollegeFilterDropdown, setShowCollegeFilterDropdown] =
+    useState(false);
   const [showBuildingDropdown, setShowBuildingDropdown] = useState(false);
   const [showFloorDropdown, setShowFloorDropdown] = useState(false);
   const [showRoomDropdown, setShowRoomDropdown] = useState(false);
@@ -54,6 +73,15 @@ export default function ServiceRequests() {
   } | null>(null);
 
   const [processingStatus, setProcessingStatus] = useState(false);
+
+  const selectedCollegeFilterName = useMemo(() => {
+    if (!collegeFilter) return "All Colleges";
+
+    return (
+      colleges.find((college) => String(college.id) === String(collegeFilter))
+        ?.name || "All Colleges"
+    );
+  }, [colleges, collegeFilter]);
 
   const selectedBuildingName = useMemo(() => {
     if (!form.building_id) return "No building selected";
@@ -86,7 +114,12 @@ export default function ServiceRequests() {
 
   useEffect(() => {
     async function initialize() {
-      await Promise.all([loadRole(), loadRequests(), loadBuildings()]);
+      await Promise.all([
+        loadRole(),
+        loadRequests(),
+        loadBuildings(),
+        loadColleges(),
+      ]);
     }
 
     initialize();
@@ -99,6 +132,8 @@ export default function ServiceRequests() {
 
     if (!user) return;
 
+    setCurrentUserId(user.id);
+
     const { data } = await supabase
       .from("profiles")
       .select("role, status")
@@ -108,6 +143,16 @@ export default function ServiceRequests() {
     if (data?.status === "approved" && data?.role) {
       setRole(data.role);
       sessionStorage.setItem("bims_role", data.role);
+    }
+  }
+
+  async function loadColleges() {
+    try {
+      const data = await getColleges();
+      setColleges(data || []);
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to load colleges", "error");
     }
   }
 
@@ -150,22 +195,44 @@ export default function ServiceRequests() {
     return isAdmin() || isChief();
   }
 
+  function canStaffCancelRequest(request: any) {
+    return (
+      isStaff() &&
+      request.submitted_by === currentUserId &&
+      ["pending", "acknowledged"].includes(request.status)
+    );
+  }
+
   function getStatusBadgeClass(status: string) {
+    if (status === "pending") {
+      return "border-black/10 bg-black/5 text-black/60";
+    }
+
+    if (status === "acknowledged") {
+      return "border-upyellow/30 bg-upyellow/20 text-black";
+    }
+
     if (status === "resolved") {
       return "border-upgreen/20 bg-upgreen/10 text-upgreen";
     }
 
-    if (status === "cancelled") {
+    if (status === "rejected") {
       return "border-upred/20 bg-upred/10 text-upred";
     }
 
-    return "border-upyellow/30 bg-upyellow/20 text-black";
+    if (status === "cancelled") {
+      return "border-black/20 bg-black/10 text-black/70";
+    }
+
+    return "border-black/10 bg-black/5 text-black/60";
   }
 
   function formatStatus(status: string) {
     if (status === "pending") return "Pending";
-    if (status === "cancelled") return "Cancelled";
+    if (status === "acknowledged") return "Acknowledged";
     if (status === "resolved") return "Resolved";
+    if (status === "rejected") return "Rejected";
+    if (status === "cancelled") return "Cancelled";
     return status;
   }
 
@@ -345,7 +412,9 @@ export default function ServiceRequests() {
       await loadRequests();
 
       showToast(
-        `Request marked as ${formatStatus(nextStatus).toLowerCase()}.`,
+        nextStatus === "cancelled"
+          ? "Request cancelled."
+          : `Request marked as ${formatStatus(nextStatus).toLowerCase()}.`,
         "success"
       );
     } catch (err: any) {
@@ -359,34 +428,64 @@ export default function ServiceRequests() {
   function handleClearFilters() {
     setSearch("");
     setStatusFilter("");
+    setCollegeFilter("");
+    setShowCollegeFilterDropdown(false);
   }
 
   const filteredRequests = useMemo(() => {
     return requests.filter((request) => {
-      const matchesStatus = statusFilter ? request.status === statusFilter : true;
+      const isOwnCancelledRequest =
+        request.status === "cancelled" && request.submitted_by === currentUserId;
 
-      const searchText = search.trim().toLowerCase();
-      const submittedByText = getSubmittedByLabel(request).toLowerCase();
+      if (request.status === "cancelled" && !isOwnCancelledRequest) {
+        return false;
+      }
 
-      const matchesSearch =
-        searchText === ""
-          ? true
-          : request.title?.toLowerCase().includes(searchText) ||
-            request.description?.toLowerCase().includes(searchText) ||
-            request.buildings?.building_name?.toLowerCase().includes(searchText) ||
-            submittedByText.includes(searchText);
+      if (statusFilter === "cancelled") {
+        if (!isOwnCancelledRequest) return false;
+      } else if (statusFilter) {
+        if (request.status !== statusFilter) return false;
+      }
 
-      return matchesStatus && matchesSearch;
+      const requestCollegeId =
+        request.buildings?.college_id !== null &&
+        request.buildings?.college_id !== undefined
+          ? String(request.buildings.college_id)
+          : "";
+
+      if (collegeFilter && requestCollegeId !== collegeFilter) {
+        return false;
+      }
+
+      const searchText = normalizeText(search);
+
+      if (!searchText) return true;
+
+      const searchableValues = [
+        request.title,
+        request.description,
+        request.buildings?.building_name,
+        request.buildings?.colleges?.name,
+        request.floors?.floor_number
+          ? `Floor ${request.floors.floor_number}`
+          : "",
+        request.rooms?.room_number ? `Room ${request.rooms.room_number}` : "",
+        getSubmittedByLabel(request),
+      ];
+
+      return searchableValues.some((value) =>
+        normalizeText(value).includes(searchText)
+      );
     });
-  }, [requests, statusFilter, search]);
+  }, [requests, statusFilter, collegeFilter, search, currentUserId]);
 
   const pendingRequests = useMemo(
     () => requests.filter((request) => request.status === "pending"),
     [requests]
   );
 
-  const cancelledRequests = useMemo(
-    () => requests.filter((request) => request.status === "cancelled"),
+  const acknowledgedRequests = useMemo(
+    () => requests.filter((request) => request.status === "acknowledged"),
     [requests]
   );
 
@@ -395,34 +494,43 @@ export default function ServiceRequests() {
     [requests]
   );
 
+  const rejectedRequests = useMemo(
+    () => requests.filter((request) => request.status === "rejected"),
+    [requests]
+  );
+
   const statCards = useMemo(() => {
     return [
       {
-        label: "Requests",
-        value: requests.length,
-        color: "bg-upred",
-      },
-      {
         label: "Pending",
         value: pendingRequests.length,
+        color: "bg-white",
+        text: "text-black",
+      },
+      {
+        label: "Acknowledged",
+        value: acknowledgedRequests.length,
         color: "bg-upyellow",
+        text: "text-white",
       },
       {
         label: "Resolved",
         value: resolvedRequests.length,
         color: "bg-upgreen",
+        text: "text-white",
       },
       {
-        label: "Cancelled",
-        value: cancelledRequests.length,
+        label: "Rejected",
+        value: rejectedRequests.length,
         color: "bg-upred",
+        text: "text-white",
       },
     ];
   }, [
-    requests.length,
     pendingRequests.length,
+    acknowledgedRequests.length,
     resolvedRequests.length,
-    cancelledRequests.length,
+    rejectedRequests.length,
   ]);
 
   return (
@@ -445,15 +553,26 @@ export default function ServiceRequests() {
                 transition={{ duration: 0.2 }}
               >
                 <p className="text-center text-xl font-semibold text-black/90">
-                  Update request status?
+                  {statusModal.nextStatus === "cancelled"
+                    ? "Cancel request?"
+                    : "Update request status?"}
                 </p>
 
                 <p className="max-w-sm text-center text-sm text-black/60">
-                  Change "{statusModal.title}" to{" "}
-                  <span className="font-semibold">
-                    {formatStatus(statusModal.nextStatus)}
-                  </span>
-                  ?
+                  {statusModal.nextStatus === "cancelled" ? (
+                    <>
+                      Mark "{statusModal.title}" as{" "}
+                      <span className="font-semibold">Cancelled</span>?
+                    </>
+                  ) : (
+                    <>
+                      Change "{statusModal.title}" to{" "}
+                      <span className="font-semibold">
+                        {formatStatus(statusModal.nextStatus)}
+                      </span>
+                      ?
+                    </>
+                  )}
                 </p>
 
                 <div className="mt-2 flex gap-5">
@@ -461,7 +580,7 @@ export default function ServiceRequests() {
                     type="button"
                     onClick={handleConfirmStatusChange}
                     disabled={processingStatus}
-                    className="rounded-lg bg-upgreen px-5 py-2 text-white/90 transition hover:scale-110"
+                    className="rounded-lg bg-upgreen px-5 py-2 text-white/90 transition hover:scale-110 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     ✔
                   </button>
@@ -470,7 +589,7 @@ export default function ServiceRequests() {
                     type="button"
                     onClick={() => setStatusModal(null)}
                     disabled={processingStatus}
-                    className="rounded-lg bg-upred px-5 py-2 text-white/90 transition hover:scale-110"
+                    className="rounded-lg bg-upred px-5 py-2 text-white/90 transition hover:scale-110 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     ✖
                   </button>
@@ -493,11 +612,11 @@ export default function ServiceRequests() {
 
         <div className="mb-6 h-px w-full bg-black/10" />
 
-        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {statCards.map((card) => (
             <div
               key={card.label}
-              className={`flex min-h-24 flex-col justify-center rounded-2xl border border-white/40 px-5 py-4 shadow-md backdrop-blur-sm ${card.color} text-white/90 transition hover:scale-105 hover:text-white hover:shadow-lg`}
+              className={`flex min-h-24 flex-col justify-center rounded-2xl border border-black/10 px-5 py-4 shadow-md backdrop-blur-sm ${card.color} ${card.text} transition hover:scale-105 hover:shadow-lg`}
             >
               <div className="text-sm font-medium">{card.label}</div>
               <div className="text-3xl font-extrabold">{card.value}</div>
@@ -509,7 +628,7 @@ export default function ServiceRequests() {
           <div />
 
           <div className="flex justify-center">
-            <div className="inline-flex overflow-hidden rounded-xl border border-black/10 bg-white/90">
+            <div className="inline-flex flex-wrap justify-center overflow-hidden rounded-xl border border-black/10 bg-white/90">
               <button
                 type="button"
                 onClick={() => setStatusFilter("")}
@@ -527,11 +646,23 @@ export default function ServiceRequests() {
                 onClick={() => setStatusFilter("pending")}
                 className={`px-5 py-2 text-sm font-medium transition ${
                   statusFilter === "pending"
-                    ? "bg-upyellow/20 text-black"
-                    : "text-black/60 hover:bg-upyellow/10"
+                    ? "bg-black/5 text-black"
+                    : "text-black/60 hover:bg-black/5"
                 }`}
               >
                 Pending
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setStatusFilter("acknowledged")}
+                className={`px-5 py-2 text-sm font-medium transition ${
+                  statusFilter === "acknowledged"
+                    ? "bg-upyellow/20 text-black"
+                    : "text-black/70 hover:bg-upyellow/10"
+                }`}
+              >
+                Acknowledged
               </button>
 
               <button
@@ -548,15 +679,29 @@ export default function ServiceRequests() {
 
               <button
                 type="button"
-                onClick={() => setStatusFilter("cancelled")}
+                onClick={() => setStatusFilter("rejected")}
                 className={`px-5 py-2 text-sm font-medium transition ${
-                  statusFilter === "cancelled"
+                  statusFilter === "rejected"
                     ? "bg-upred/10 text-upred"
                     : "text-upred hover:bg-upred/10"
                 }`}
               >
-                Cancelled
+                Rejected
               </button>
+
+              {isStaff() && (
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter("cancelled")}
+                  className={`px-5 py-2 text-sm font-medium transition ${
+                    statusFilter === "cancelled"
+                      ? "bg-black/10 text-black"
+                      : "text-black/60 hover:bg-black/5"
+                  }`}
+                >
+                  Cancelled
+                </button>
+              )}
             </div>
           </div>
 
@@ -627,7 +772,9 @@ export default function ServiceRequests() {
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                   <div className="relative">
-                    <label className="mb-1 block text-sm font-medium">Building</label>
+                    <label className="mb-1 block text-sm font-medium">
+                      Building
+                    </label>
 
                     <button
                       type="button"
@@ -684,7 +831,9 @@ export default function ServiceRequests() {
                   </div>
 
                   <div className="relative">
-                    <label className="mb-1 block text-sm font-medium">Floor</label>
+                    <label className="mb-1 block text-sm font-medium">
+                      Floor
+                    </label>
 
                     <button
                       type="button"
@@ -747,7 +896,9 @@ export default function ServiceRequests() {
                   </div>
 
                   <div className="relative">
-                    <label className="mb-1 block text-sm font-medium">Room</label>
+                    <label className="mb-1 block text-sm font-medium">
+                      Room
+                    </label>
 
                     <button
                       type="button"
@@ -871,42 +1022,109 @@ export default function ServiceRequests() {
 
         {showFilters && (
           <div className="mb-6 flex w-full justify-center">
-            <div className="grid w-full max-w-3xl grid-cols-1 gap-4 md:grid-cols-[1fr_auto] md:items-end">
+            <div className="grid w-full max-w-5xl grid-cols-1 gap-5 md:grid-cols-2 md:items-end">
+
+              <div className="relative">
+                <label className="mb-1 block text-sm font-medium">
+                  Filter by College
+                </label>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setShowCollegeFilterDropdown((prev) => !prev)
+                  }
+                  className="flex w-full items-center justify-between rounded-lg border border-upred/30 bg-white/90 p-3 text-left transition hover:border-upred/50"
+                >
+                  <span>{selectedCollegeFilterName}</span>
+
+                  <ChevronDown
+                    className={`h-5 w-5 text-black/50 transition ${
+                      showCollegeFilterDropdown ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+
+                {showCollegeFilterDropdown && (
+                  <div className="absolute left-0 right-0 z-40 mt-2 max-h-72 overflow-y-auto rounded-xl border border-upred/20 bg-white shadow-xl">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCollegeFilter("");
+                        setShowCollegeFilterDropdown(false);
+                      }}
+                      className={`flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-upred/5 ${
+                        !collegeFilter ? "font-semibold text-upred" : "text-black"
+                      }`}
+                    >
+                      All Colleges
+                      {!collegeFilter && <Check className="h-4 w-4" />}
+                    </button>
+
+                    {colleges.map((college) => {
+                      const isSelected =
+                        String(college.id) === String(collegeFilter);
+
+                      return (
+                        <button
+                          key={college.id}
+                          type="button"
+                          onClick={() => {
+                            setCollegeFilter(String(college.id));
+                            setShowCollegeFilterDropdown(false);
+                          }}
+                          className={`flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-upred/5 ${
+                            isSelected ? "font-semibold text-upred" : "text-black"
+                          }`}
+                        >
+                          {college.name}
+                          {isSelected && <Check className="h-4 w-4" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
               <div>
                 <label className="mb-1 block text-sm font-medium">
                   Search Requests
                 </label>
 
                 <input
-                  type="text"
+                  type="search"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search by title, description, building, or submitter"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") e.preventDefault();
+                  }}
+                  placeholder="college, building, room, floor, description, submitter"
                   className="w-full rounded-lg border border-upred/30 bg-white/90 p-3"
                 />
               </div>
 
-              {(search || statusFilter) && (
-                <button
-                  type="button"
-                  onClick={handleClearFilters}
-                  className="rounded-xl border border-upred/30 px-5 py-3 text-sm font-medium text-upred transition hover:bg-upred/10"
-                >
-                  Clear Filters
-                </button>
+              {(search || statusFilter || collegeFilter) && (
+                <div className="flex justify-center md:col-span-2">
+                  <button
+                    type="button"
+                    onClick={handleClearFilters}
+                    className="rounded-xl border border-upred/30 px-5 py-2 text-sm font-medium text-upred transition hover:bg-upred/10"
+                  >
+                    Clear Filters
+                  </button>
+                </div>
               )}
             </div>
           </div>
         )}
 
         <div className="rounded-2xl border border-upred/15 bg-white/80 p-5 shadow-sm backdrop-blur-sm">
-          <div className="mb-4 flex flex-col gap-1">
+          <div className="mb-4 flex flex-wrap items-center gap-3">
             <h2 className="text-xl font-bold text-upred">Submitted Requests</h2>
 
-            <p className="text-sm text-black/60">
-              {filteredRequests.length} request
-              {filteredRequests.length !== 1 && "s"} found
-            </p>
+            <span className="rounded-full border border-black/10 bg-black/5 px-3 py-1 text-xs font-semibold text-black/60">
+              {filteredRequests.length}
+            </span>
           </div>
 
           {loadingRequests ? (
@@ -949,14 +1167,18 @@ export default function ServiceRequests() {
                         </p>
 
                         <p>
-                          <span className="font-semibold text-black">Floor:</span>{" "}
+                          <span className="font-semibold text-black">
+                            Floor:
+                          </span>{" "}
                           {request.floors?.floor_number
                             ? `Floor ${request.floors.floor_number}`
                             : "Not specified"}
                         </p>
 
                         <p>
-                          <span className="font-semibold text-black">Room:</span>{" "}
+                          <span className="font-semibold text-black">
+                            Room:
+                          </span>{" "}
                           {request.rooms?.room_number
                             ? `Room ${request.rooms.room_number}`
                             : "Not specified"}
@@ -981,42 +1203,70 @@ export default function ServiceRequests() {
                       </p>
                     </div>
 
-                    {canManageStatus() && (
+                    {(canManageStatus() || canStaffCancelRequest(request)) && (
                       <div className="flex shrink-0 flex-wrap gap-2">
-                        {request.status !== "pending" && (
+                        {canManageStatus() && request.status === "pending" && (
                           <button
                             type="button"
                             onClick={() =>
-                              requestStatusChange(request.id, request.title, "pending")
+                              requestStatusChange(
+                                request.id,
+                                request.title,
+                                "acknowledged"
+                              )
                             }
                             className="rounded-xl border border-upyellow/40 px-4 py-2 text-sm font-medium text-black transition hover:bg-upyellow/20"
                           >
-                            Mark Pending
+                            Acknowledged
                           </button>
                         )}
 
-                        {request.status !== "resolved" && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              requestStatusChange(request.id, request.title, "resolved")
-                            }
-                            className="rounded-xl border border-upgreen/30 px-4 py-2 text-sm font-medium text-upgreen transition hover:bg-upgreen/10"
-                          >
-                            <Check className="mr-1 inline h-4 w-4" />
-                            Mark Resolved
-                          </button>
-                        )}
+                        {canManageStatus() &&
+                          ["pending", "acknowledged"].includes(request.status) && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                requestStatusChange(
+                                  request.id,
+                                  request.title,
+                                  "resolved"
+                                )
+                              }
+                              className="rounded-xl border border-upgreen/30 px-4 py-2 text-sm font-medium text-upgreen transition hover:bg-upgreen/10"
+                            >
+                              Resolved
+                            </button>
+                          )}
 
-                        {request.status !== "cancelled" && (
+                        {canManageStatus() &&
+                          ["pending", "acknowledged"].includes(request.status) && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                requestStatusChange(
+                                  request.id,
+                                  request.title,
+                                  "rejected"
+                                )
+                              }
+                              className="rounded-xl border border-upred/30 px-4 py-2 text-sm font-medium text-upred transition hover:bg-upred/10"
+                            >
+                              Rejected
+                            </button>
+                          )}
+
+                        {canStaffCancelRequest(request) && (
                           <button
                             type="button"
                             onClick={() =>
-                              requestStatusChange(request.id, request.title, "cancelled")
+                              requestStatusChange(
+                                request.id,
+                                request.title,
+                                "cancelled"
+                              )
                             }
-                            className="rounded-xl border border-upred/30 px-4 py-2 text-sm font-medium text-upred transition hover:bg-upred/10"
+                            className="rounded-xl border border-black/20 px-4 py-2 text-sm font-medium text-black/70 transition hover:bg-black/5"
                           >
-                            <X className="mr-1 inline h-4 w-4" />
                             Cancel Request
                           </button>
                         )}
